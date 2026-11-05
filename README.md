@@ -8,7 +8,22 @@ you will be asked, and how to answer.
 
 Design rationale, role architecture and the v2 plan are in [DESIGN.md](DESIGN.md).
 
-## The easy way: run it inside Claude Code
+## The easiest way: the web app
+
+Open **https://claude.ai/artifact/4gwYTmavK8DDqwSZTnFvAp** (private to the
+owner's claude.ai account). It is a chat-style page: pick a mode, paste your
+deck outline or memo, add what you are worried about, press Rehearse. Each
+role appears as its own message with an avatar and a stance; the Judge's
+brief is highlighted; afterwards you can ask any role a follow-up and, after
+the real meeting, record what was actually asked. Runs on your own Claude
+account through the artifact runtime (`sample`), stores rehearsals, profile
+and debrief log privately (`db`). No API key, nothing to install.
+
+The page is built from this repo: `python scripts/build_app.py` bundles
+`roles/`, `modes.yaml`, `profile/` and the output schemas into
+`app/index.html`, which is then republished to the same URL.
+
+## The second way: run it inside Claude Code
 
 Nothing to install, no API key. Open a Claude Code session on this repository
 (web, desktop or cloud), paste your deck outline or memo, and type:
