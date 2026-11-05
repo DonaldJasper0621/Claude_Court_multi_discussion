@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rehearsal · {{ s.mode_title }} · {{ s.id }}</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #ffffff; --ink: #1c1c1a; --muted: #6b6a66; --line: #e3e1da;
+    --accent: #2e5aac; --go: #1f7a4d; --revise: #b8741a; --no_go: #b23a3a;
+    --supportive: #1f7a4d; --neutral: #6b6a66; --skeptical: #b8741a; --blocking: #b23a3a;
+    --high: #b23a3a; --medium: #b8741a; --low: #6b6a66;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #15161a; --card: #1e2026; --ink: #ecebe6; --muted: #9a99a0; --line: #2e3038; --accent: #7aa2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 32px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 8px; }
+  ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; text-transform: uppercase; letter-spacing: .04em; vertical-align: middle; }
+  .verdict-go { background: var(--go); } .verdict-revise { background: var(--revise); } .verdict-no_go { background: var(--no_go); }
+  .stance-supportive { background: var(--supportive); } .stance-neutral { background: var(--neutral); }
+  .stance-skeptical { background: var(--skeptical); } .stance-blocking { background: var(--blocking); }
+  .sev { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .sev-high { color: var(--high); } .sev-medium { color: var(--medium); } .sev-low { color: var(--low); }
+  .headline { font-size: 18px; margin: 10px 0 0; }
+  .banner { background: var(--revise); color: #fff; padding: 8px 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .q { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 0 8px 8px 0; }
+  .q .ask { font-weight: 600; }
+  details { margin: 6px 0; }
+  summary { cursor: pointer; color: var(--accent); }
+  pre { white-space: pre-wrap; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .err { color: var(--no_go); }
+  .where { color: var(--muted); font-style: italic; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 12px; }
+  .storyline li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<main>
+
+{% if s.mock %}
+<div class="banner">Mock run. Every string below is a placeholder generated without calling the model. Use this only to check the pipeline and the report layout.</div>
+{% endif %}
+
+<header>
+  <div class="small muted">{{ s.created_at }} · session <code>{{ s.id }}</code>{% if s.worry %} · worry: {{ s.worry }}{% endif %}</div>
+  <h1>{{ s.mode_title }}</h1>
+  {% if s.judge %}
+  <div><span class="badge verdict-{{ s.judge.verdict }}">{{ s.judge.verdict | replace("_", " ") }}</span></div>
+  <p class="headline">{{ s.judge.headline }}</p>
+  {% if s.judge.decision %}<p><strong>Decision:</strong> {{ s.judge.decision }}</p>{% endif %}
+  {% elif s.errors.judge %}
+  <p class="err">Judge failed: {{ s.errors.judge }}</p>
+  {% endif %}
+</header>
+
+{# ------------------------------------------------------------------ Judge #}
+{% if s.judge %}
+<h2>Pre-meeting brief</h2>
+<div class="two">
+  <div class="card">
+    <h3>Must fix before sending</h3>
+    {% if s.judge.must_fix_before_sending %}
+    <ol>{% for item in s.judge.must_fix_before_sending %}<li>{{ item }}</li>{% endfor %}</ol>
+    {% else %}<p class="muted">Nothing blocking.</p>{% endif %}
+    <h3 style="margin-top:14px">Next steps</h3>
+    <ul>{% for item in s.judge.next_steps %}<li>{{ item }}</li>{% endfor %}</ul>
+  </div>
+  <div class="card">
+    <h3>Blind spots</h3>
+    {% if s.judge.blind_spots %}
+    <ul>{% for item in s.judge.blind_spots %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None identified.</p>{% endif %}
+    <h3 style="margin-top:14px">Consensus</h3>
+    <ul>{% for item in s.judge.consensus %}<li>{{ item }}</li>{% endfor %}</ul>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Questions you will be asked</h3>
+  {% for q in s.judge.likely_questions %}
+  <div class="q">
+    <div class="ask">“{{ q.question }}”</div>
+    <div class="small muted">{{ q.asked_by }} · {{ q.why_they_ask }}</div>
+    <div style="margin-top:6px"><strong>Say:</strong> {{ q.suggested_answer }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if s.judge.dissent %}
+<div class="card">
+  <h3>Where the panel disagrees</h3>
+  {% for d in s.judge.dissent %}
+  <p><strong>{{ d.topic }}</strong></p>
+  <ul>{% for p in d.positions %}<li>{{ p }}</li>{% endfor %}</ul>
+  <p class="small"><span class="muted">Root cause:</span> {{ d.root_cause }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{# ------------------------------------------------------------------ Coach storyline #}
+{% if s.storyline %}
+<h2>Coach: recommended storyline</h2>
+<div class="card">
+  <p><strong>In one sentence:</strong> {{ s.storyline.one_line_restatement }}</p>
+  <h3 style="margin-top:12px">Open with (SCQA)</h3>
+  <ul>
+    <li><strong>Situation.</strong> {{ s.storyline.opening_scqa.situation }}</li>
+    <li><strong>Complication.</strong> {{ s.storyline.opening_scqa.complication }}</li>
+    <li><strong>Question.</strong> {{ s.storyline.opening_scqa.question }}</li>
+    <li><strong>Answer.</strong> {{ s.storyline.opening_scqa.answer }}</li>
+  </ul>
+</div>
+<div class="two">
+  <div class="card">
+    <h3>Storyline</h3>
+    <ol class="storyline">
+      {% for item in s.storyline.recommended_storyline %}
+      <li><strong>{{ item.title }}</strong><br>{{ item.key_message }}<br><span class="small muted">{{ item.why_here }}</span></li>
+      {% endfor %}
+    </ol>
+  </div>
+  <div class="card">
+    <h3>Changes from your version</h3>
+    <ul>{% for c in s.storyline.changes_from_original %}<li>{{ c }}</li>{% endfor %}</ul>
+    <h3 style="margin-top:14px">So-what ladder</h3>
+    <ol>{% for step in s.storyline.so_what_ladder %}<li>{{ step }}</li>{% endfor %}</ol>
+    {% if s.storyline.frameworks_used %}
+    <p class="small muted" style="margin-top:10px">Frameworks: {% for f in s.storyline.frameworks_used %}<strong>{{ f.framework }}</strong> ({{ f.why_here }}){% if not loop.last %}; {% endif %}{% endfor %}</p>
+    {% endif %}
+  </div>
+</div>
+{% elif s.errors.coach_post %}
+<h2>Coach: recommended storyline</h2><p class="err">Failed: {{ s.errors.coach_post }}</p>
+{% endif %}
+
+{# ------------------------------------------------------------------ Advocate / Challenger #}
+<h2>Advocate vs Challenger</h2>
+<div class="two">
+  <div class="card">
+    <h3>Advocate</h3>
+    {% if s.advocate %}
+    <p><strong>Strongest case:</strong> {{ s.advocate.strongest_case }}</p>
+    <p><strong>Lead with:</strong> {{ s.advocate.lead_with }}</p>
+    <p><strong>Under-sold strengths</strong></p>
+    <ul>{% for st in s.advocate.undersold_strengths %}<li>{{ st.strength }} <span class="where">({{ st.where_in_material }})</span></li>{% endfor %}</ul>
+    <details><summary>Objections and rebuttals</summary>
+      <ul>{% for r in s.advocate.objections_and_rebuttals %}
+        <li><strong>{{ r.objection }}</strong><br>{{ r.rebuttal }}
+          {% if not r.supported_by_material %}<br><span class="small err">Needs evidence: {{ r.evidence_needed }}</span>{% endif %}</li>
+      {% endfor %}</ul>
+    </details>
+    {% else %}<p class="err">Failed: {{ s.errors.advocate }}</p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>Challenger</h3>
+    {% if s.challenger %}
+    <p><strong>The question you hope nobody asks:</strong> “{{ s.challenger.the_question_they_hope_nobody_asks }}”</p>
+    <ol>{% for c in s.challenger.challenges %}
+      <li><span class="sev sev-{{ c.damage_if_raised_live }}">{{ c.damage_if_raised_live }}</span> · <span class="small muted">{{ c.kind | replace("_", " ") }}</span><br>
+        {{ c.challenge }} <span class="where">({{ c.where_in_material }})</span><br>
+        <span class="small"><strong>Close it:</strong> {{ c.what_would_close_it }}</span></li>
+    {% endfor %}</ol>
+    {% else %}<p class="err">Failed: {{ s.errors.challenger }}</p>{% endif %}
+  </div>
+</div>
+
+{# ------------------------------------------------------------------ Panel #}
+<h2>Panel ({{ panel | length }}) · independent reads, sorted by stance</h2>
+<div class="grid">
+  {% for r in panel %}
+  <div class="card">
+    <h3>{{ r.role_name }}</h3>
+    {% if r.output %}
+    <div><span class="badge stance-{{ r.output.stance }}">{{ r.output.stance }}</span></div>
+    <p style="margin-top:8px">{{ r.output.one_line_reaction }}</p>
+    <div class="q"><div class="ask">“{{ r.output.the_question }}”</div></div>
+    <p><strong>Concerns</strong></p>
+    <ul>{% for c in r.output.top_concerns %}
+      <li><span class="sev sev-{{ c.severity }}">{{ c.severity }}</span> {{ c.concern }} <span class="where">({{ c.where_in_material }})</span></li>
+    {% endfor %}</ul>
+    <p class="small"><strong>Would say yes if:</strong> {{ r.output.what_would_make_me_say_yes }}</p>
+    {% else %}
+    <p class="err">Failed: {{ r.error }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{# ------------------------------------------------------------------ Structure #}
+{% if s.structure %}
+<h2>Coach: structure analysis (pre-pass)</h2>
+<div class="card">
+  <p><strong>Restatement:</strong> {{ s.structure.one_line_restatement }}</p>
+  <p><strong>Central question:</strong> {{ s.structure.central_question }}</p>
+  <p><strong>Leads with answer:</strong> {{ "yes" if s.structure.leads_with_answer else "no" }}. {{ s.structure.answer_first_note }}</p>
+  <details open><summary>Issue tree</summary>
+    <ul>{% for b in s.structure.issue_tree %}<li>{{ b.sub_question }}<ul>{% for p in b.sub_points %}<li>{{ p }}</li>{% endfor %}</ul></li>{% endfor %}</ul>
+  </details>
+  {% if s.structure.mece_gaps %}<p><strong>MECE gaps</strong></p><ul>{% for g in s.structure.mece_gaps %}<li>{{ g }}</li>{% endfor %}</ul>{% endif %}
+  {% if s.structure.logic_breaks %}<p><strong>Logic breaks</strong></p>
+    <ul>{% for lb in s.structure.logic_breaks %}<li><strong>{{ lb.claim }}</strong> <span class="where">({{ lb.where_in_material }})</span><br>{{ lb.why_it_does_not_follow }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ Input #}
+<h2>Your material</h2>
+<details><summary>Show input</summary><pre>{{ s.input_text }}</pre></details>
+
+{# ------------------------------------------------------------------ Debrief #}
+{% if s.debrief %}
+<h2>Debrief ({{ s.debrief.recorded_at }})</h2>
+<div class="card">
+  <p><strong>Outcome in the room:</strong> {{ s.debrief.outcome_in_room }}</p>
+  <ul>{% for a in s.debrief.predicted %}<li>{{ "✓" if a.asked else "—" }} {{ a.question }} <span class="small muted">({{ a.predicted_for }})</span></li>{% endfor %}</ul>
+  {% if s.debrief.unpredicted %}<p><strong>Not predicted</strong></p><ul>{% for q in s.debrief.unpredicted %}<li>{{ q }}</li>{% endfor %}</ul>{% endif %}
+  {% if s.debrief.notes %}<p class="small">{{ s.debrief.notes }}</p>{% endif %}
+</div>
+{% endif %}
+
+<footer>
+  {{ n_calls }} model calls · {{ seconds }}s total model time ·
+  {{ "{:,}".format(usage.input_tokens) }} in / {{ "{:,}".format(usage.output_tokens) }} out
+  {% if usage.cache_read_input_tokens %} · {{ "{:,}".format(usage.cache_read_input_tokens) }} cached{% endif %}
+  {% if cost is not none %} · est. ${{ "%.2f" | format(cost) }}{% endif %}
+  {% if s.errors %}<br><span class="err">{{ s.errors | length }} role(s) failed; see sections above.</span>{% endif %}
+</footer>
+</main>
+</body>
+</html>

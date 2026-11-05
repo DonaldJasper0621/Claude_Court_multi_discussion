@@ -1,0 +1,30 @@
+[project]
+name = "rehearsal"
+version = "0.1.0"
+description = "Pre-meeting rehearsal room: a simulated stakeholder panel for a Business Analyst's decks, memos and decisions."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=2.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+rehearse = "rehearsal.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rehearsal"]
+
+[tool.setuptools.package-data]
+rehearsal = ["templates/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

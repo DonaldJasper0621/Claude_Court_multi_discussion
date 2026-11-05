@@ -1,0 +1,85 @@
+# Five entry points matching the stages of a BA project.
+# `panel` lists default panelist role ids (files in roles/panel/).
+# `emphasis` is injected into every role's prompt for this mode.
+# `judge_focus` is injected into the Judge's prompt only.
+
+framing:
+  title: Framing Check
+  description: Project start. Is this the right problem to solve?
+  input_hint: A problem statement, the ask you received, and your first-cut framing.
+  panel: [director, senior_manager, strategy_partner, methodology_reviewer, customer]
+  emphasis: |
+    The material is a problem statement at the start of a project, before any
+    analysis has been done. Your job is to test the framing, not the answer.
+    Ask yourself: what do I think the real problem is? Is the question as posed
+    the one leadership actually needs answered? What would be a waste of two
+    weeks? What is being assumed about the business outcome this ties to?
+  judge_focus: |
+    Decide whether the framing is right, too narrow, too broad, or aimed at the
+    wrong question. If the panel disagrees about what the real problem is, that
+    disagreement is the most important finding: surface it and name the root
+    cause. Recommend a reframed problem statement if one is warranted.
+
+method:
+  title: Method Review
+  description: Analysis design. Will the approach survive scrutiny?
+  input_hint: Your analytical approach, data sources, metric definitions, test design, sizing method.
+  panel: [methodology_reviewer, finance, risk_compliance, tech_product, senior_manager]
+  emphasis: |
+    The material describes an analytical approach that has not yet been
+    executed. Focus on whether the method will produce a defensible answer:
+    metric definitions, denominators, control groups, confounders, seasonality,
+    data availability, sizing assumptions, and whether the output will actually
+    answer the business question. Do not critique presentation.
+  judge_focus: |
+    Rank the methodological risks by how likely they are to invalidate the
+    conclusion. Separate "must change before running" from "document and
+    caveat". If the method is sound, say so plainly.
+
+preread:
+  title: Pre-read Review
+  description: Before a deck or memo goes to leadership. Full rehearsal.
+  input_hint: Deck outline (slide titles and key messages) or memo. Use placeholders for real figures.
+  panel: [director, senior_manager, methodology_reviewer, risk_compliance, finance, tech_product, customer]
+  emphasis: |
+    The material is about to be sent to leadership. Read it exactly as you
+    would a pre-read the night before the meeting. React to what is actually on
+    the page. The author needs to know what you will say aloud in the room and
+    what would stop you from supporting the recommendation.
+  judge_focus: |
+    Produce the brief the author reads two hours before sending. Lead with
+    go / revise / no_go and one sentence of why. The must-fix list should be
+    short and concrete. The likely-questions list is the core deliverable:
+    questions that will actually be asked, by whom, and a suggested answer the
+    author can say in under thirty seconds.
+
+stakeholder:
+  title: Stakeholder Prep
+  description: Before a meeting with one function. Predict objections.
+  input_hint: What you are asking for, from whom, and what you already know about their position. Override the panel with --panel.
+  panel: [risk_compliance, tech_product, finance, ops]
+  emphasis: |
+    The author is about to meet a specific function to ask for something:
+    approval, resources, data, a process change. Respond as that function
+    would in the meeting. Be specific about what you would push back on, what
+    you would need to see, and what would make this easy to say yes to.
+  judge_focus: |
+    Organize the brief around the meeting itself: what to open with, the
+    objections in the order they will surface, how to handle each, and what
+    the author should not say. Identify the single concession or piece of
+    evidence most likely to unlock agreement.
+
+decide:
+  title: Decide
+  description: Choosing between options. The Judge must pick.
+  input_hint: The options, your criteria, what you know about each, and your current lean.
+  panel: [director, senior_manager, finance, strategy_partner, methodology_reviewer, tech_product]
+  emphasis: |
+    The material lays out two or more options. Evaluate them from your seat.
+    State which option you would support and why, what would change your mind,
+    and what the author is underweighting. Do not refuse to choose.
+  judge_focus: |
+    Make a recommendation. Name the option, the two or three trade-offs that
+    actually drive the choice, the conditions under which you would reverse it,
+    and the cheapest piece of evidence that would resolve the main uncertainty.
+    Neutrality is not an acceptable output in this mode.

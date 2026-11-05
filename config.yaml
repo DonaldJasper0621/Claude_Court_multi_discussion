@@ -1,0 +1,26 @@
+# Rehearsal Room configuration.
+# Model IDs are exact strings; do not append date suffixes.
+
+models:
+  panel: claude-opus-5-5        # panelists, advocate, challenger
+  judge: claude-opus-5-5
+  coach: claude-opus-5-5
+
+effort:
+  panel: medium
+  judge: high
+  coach: high
+
+max_tokens: 8000                # per role response; structured outputs are compact
+max_concurrency: 6              # parallel role calls
+
+# Language for all role output. The meeting is in English, so Q&A prep is most
+# useful in English. Set to "zh-TW" if you want the brief in Traditional Chinese.
+output_language: en
+
+paths:
+  roles: roles
+  modes: modes.yaml
+  profile: profile/workplace.md
+  debrief_log: profile/debrief_log.md
+  sessions: sessions

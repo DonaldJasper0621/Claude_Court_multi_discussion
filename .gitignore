@@ -1,0 +1,15 @@
+# Run outputs: may contain work material. Never commit.
+sessions/*
+!sessions/.gitkeep
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
