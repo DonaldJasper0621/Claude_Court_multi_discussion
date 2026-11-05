@@ -1,0 +1,629 @@
+<title>Rehearsal Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a two-pane chat. Left rail lists rehearsals; the main pane is the thread with a composer pinned at the bottom. */
+  :root {
+    --bg: #eef1f5; --surface: #ffffff; --surface-2: #f6f8fb; --ink: #17202b; --ink-2: #4f5b68; --ink-3: #8a94a0;
+    --line: #d9dfe7; --accent: #1f6f8b; --accent-ink: #ffffff; --user: #dfe9f1;
+    --go: #1e7b4f; --revise: #b4711c; --no_go: #b23a3a;
+    --supportive: #1e7b4f; --neutral: #6b7682; --skeptical: #b4711c; --blocking: #b23a3a;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --r: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161b; --surface: #1a2027; --surface-2: #202830; --ink: #e8edf2; --ink-2: #a9b4bf; --ink-3: #74808c;
+      --line: #2c353f; --accent: #5fb3d0; --accent-ink: #0f1a20; --user: #243240; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161b; --surface: #1a2027; --surface-2: #202830; --ink: #e8edf2; --ink-2: #a9b4bf; --ink-3: #74808c;
+    --line: #2c353f; --accent: #5fb3d0; --accent-ink: #0f1a20; --user: #243240; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .app { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+  @media (max-width: 820px) { .app { grid-template-columns: 1fr; } .rail { display: none; } .app.rail-open .rail { display: flex; position: fixed; inset: 0; z-index: 20; } }
+
+  /* Rail */
+  .rail { display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--line); min-width: 0; }
+  .rail-head { padding: 16px max(16px, env(safe-area-inset-left, 0px)) 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .brand { font-weight: 600; letter-spacing: .01em; }
+  .brand small { display: block; color: var(--ink-3); font-weight: 400; font-size: 12px; }
+  .rail-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .rail-item { width: 100%; text-align: left; background: none; border: 0; border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+  .rail-item:hover { background: var(--surface-2); }
+  .rail-item.active { background: var(--user); }
+  .rail-item .t { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rail-item .m { color: var(--ink-3); font-size: 12px; display: flex; gap: 8px; align-items: center; }
+  .rail-foot { padding: 10px 8px max(10px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); display: grid; gap: 4px; }
+  .rail-foot button { background: none; border: 0; border-radius: 10px; padding: 8px 12px; text-align: left; color: var(--ink-2); }
+  .rail-foot button:hover { background: var(--surface-2); }
+
+  /* Main */
+  .main { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .icon-btn { background: none; border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; color: var(--ink-2); }
+  .icon-btn:hover { background: var(--surface-2); }
+  .menu-btn { display: none; }
+  @media (max-width: 820px) { .menu-btn { display: inline-block; } }
+  .thread { flex: 1; overflow-y: auto; padding: 20px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px)); }
+  .thread-inner { max-width: 820px; margin: 0 auto; display: grid; gap: 14px; }
+
+  /* Messages */
+  .msg { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; }
+  .msg.user { grid-template-columns: 1fr 36px; }
+  .msg.user .bubble { background: var(--user); border-color: transparent; }
+  .avatar { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font: 500 12px/1 var(--mono); color: #fff; letter-spacing: .02em; }
+  .msg.user .avatar { order: 2; background: var(--ink-2); }
+  .bubble { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-width: 0; }
+  .bubble.judge { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+  .who { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .who .name { font-weight: 600; }
+  .who .sub { color: var(--ink-3); font-size: 12px; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #fff; }
+  .pill.verdict-go { background: var(--go); } .pill.verdict-revise { background: var(--revise); } .pill.verdict-no_go { background: var(--no_go); }
+  .pill.supportive { background: var(--supportive); } .pill.neutral { background: var(--neutral); } .pill.skeptical { background: var(--skeptical); } .pill.blocking { background: var(--blocking); }
+  .sev { font: 500 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; padding: 2px 5px; border-radius: 4px; border: 1px solid currentColor; }
+  .sev.high { color: var(--no_go); } .sev.medium { color: var(--revise); } .sev.low { color: var(--ink-3); }
+  .bubble p { margin: 0 0 8px; } .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { margin: 4px 0 8px; padding-left: 20px; } .bubble li { margin: 3px 0; }
+  .bubble h4 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+  .q { border-left: 3px solid var(--accent); padding: 6px 10px; margin: 8px 0; background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 0 8px 8px 0; }
+  .q .ask { font-weight: 500; }
+  .where { color: var(--ink-3); font-style: italic; font-size: 13px; }
+  .muted { color: var(--ink-3); } .small { font-size: 13px; }
+  .err { color: var(--no_go); }
+  details { margin: 6px 0; } summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  pre { white-space: pre-wrap; font: 13px/1.5 var(--mono); margin: 6px 0; overflow-x: auto; }
+  .thinking { display: inline-flex; gap: 4px; align-items: center; color: var(--ink-3); font-size: 13px; }
+  .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: blink 1.2s infinite; }
+  .thinking i:nth-child(2) { animation-delay: .2s; } .thinking i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .thinking i { animation: none; opacity: .6; } }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 6px 12px; font-size: 13px; color: var(--ink-2); }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 500; }
+  .btn.primary:disabled { opacity: .5; cursor: default; }
+  .system { text-align: center; color: var(--ink-3); font-size: 13px; }
+  .lq { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 6px 0; }
+  .lq .ask { font-weight: 500; } .lq .say { margin-top: 4px; }
+
+  /* Composer */
+  .composer { border-top: 1px solid var(--line); background: var(--surface); padding: 12px max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .composer-inner { max-width: 820px; margin: 0 auto; display: grid; gap: 8px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 4px 11px; font-size: 13px; color: var(--ink-2); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .chip.role { padding-left: 6px; display: inline-flex; align-items: center; gap: 6px; }
+  .chip .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  textarea { width: 100%; min-height: 96px; max-height: 40vh; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); line-height: 1.45; }
+  textarea.followup { min-height: 44px; }
+  input[type="text"], select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface-2); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row .grow { flex: 1; min-width: 160px; }
+  .hint { color: var(--ink-3); font-size: 12px; }
+  .warn { background: color-mix(in srgb, var(--revise) 12%, transparent); border: 1px solid color-mix(in srgb, var(--revise) 40%, transparent); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+
+  /* Panels (profile, settings) */
+  .sheet { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 40%, transparent); z-index: 30; display: grid; place-items: center; padding: 16px; }
+  .sheet .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; width: min(760px, 100%); max-height: 90vh; overflow: auto; padding: 18px; display: grid; gap: 12px; }
+  .sheet h3 { margin: 0; }
+  .sheet textarea { min-height: 50vh; font-family: var(--mono); font-size: 13px; }
+  .field { display: grid; gap: 4px; }
+  .field label { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+  .debrief-item { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); }
+  .debrief-item input { margin-top: 4px; }
+</style>
+
+<div class="app" id="app">
+  <aside class="rail" id="rail">
+    <div class="rail-head">
+      <div class="brand">Rehearsal Room<small>Pre-meeting panel for your decks and decisions</small></div>
+      <button class="icon-btn menu-btn" id="railClose" aria-label="Close menu">✕</button>
+    </div>
+    <div class="rail-list" id="railList"></div>
+    <div class="rail-foot">
+      <button id="newBtn">+ New rehearsal</button>
+      <button id="profileBtn">Workplace profile</button>
+      <button id="settingsBtn">Settings</button>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="topbar">
+      <button class="icon-btn menu-btn" id="railOpen" aria-label="Open menu">☰</button>
+      <div class="title" id="title">New rehearsal</div>
+      <button class="icon-btn" id="copyBtn" hidden>Copy brief</button>
+    </div>
+    <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
+    <div class="composer"><div class="composer-inner" id="composer"></div></div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet" hidden></div>
+
+<script id="data" type="application/json">{"protocol": "You are one voice in a pre-meeting rehearsal for a Business Analyst at a large\nUS consumer bank. The analyst is about to take material (a deck outline, memo,\nproblem statement, analysis plan, or set of options) into a real meeting. Your\njob is to react exactly as the person you are playing would, so the analyst can\nprepare.\n\nRules of the rehearsal:\n\n1. You are reading independently. You have not seen any other reviewer's\n   response and you must not guess at it. Give your own view.\n2. React to this material. Reference specific slides, sections, claims or\n   numbers. A comment that could be pasted onto a different deck is worthless.\n3. The material is de-identified. Bracketed placeholders such as [X], [N] or\n   [$M] stand for real figures that exist in the actual document. Do not\n   complain that numbers are missing. If a figure's provenance or baseline\n   matters, ask about that instead.\n4. Stay in your lane. Other reviewers cover other angles. Depth in your own\n   perspective beats breadth.\n5. Be direct and specific. No hedging, no generic advice, no lists of every\n   conceivable concern. Name the one or two things you actually care about.\n6. Respond in {language}. Keep technical and business terms in English.\n7. Your answer must follow the required output schema exactly.\n", "panelProtocolExtra": "8. \"the_question\" is the single question you would actually say aloud in the\n   room. Not a list. Not rhetorical. The question you would really ask.\n9. \"what_would_make_me_say_yes\" is concrete: the evidence, change or\n   commitment that would move you to support this.\n", "roles": {"advocate": {"id": "advocate", "name": "Advocate", "layer": "mechanism", "body": "You are the author's strongest honest ally. You have read the material closely\nand your job is to build the most compelling case for it that the evidence\nactually supports. You are not a cheerleader. You are the colleague who says\n\"here is what you have that is genuinely strong, and here is how to say it so\nthe room hears it\".\n\n## What you do\n\n- Identify the strengths the author under-sold or buried. Analysts routinely\n  put their best finding on slide nine.\n- State the strongest version of the recommendation in one sentence a Director\n  would repeat to a VP.\n- Anticipate the two or three most likely objections and give the best\n  rebuttal the material supports. If the material does not support a rebuttal,\n  say so and name what evidence would.\n- Name what the author should lead with in the first minute of the meeting.\n\n## Hard rules\n\n- Every strength you name must point to something specific in the material.\n- Do not invent evidence. If the case is weak, your job is to find the\n  strongest true thing, not to inflate.\n- Do not hedge your advocacy into neutrality. The Challenger exists to balance\n  you. Argue your side.\n- Stay inside what a Capital One audience would find persuasive: quantified\n  impact, customer benefit, risk awareness, well-managed execution."}, "challenger": {"id": "challenger", "name": "Challenger", "layer": "mechanism", "body": "You are the sharpest skeptic the author will ever face, and you are on their\nside: you find the holes now so that nobody finds them in the room. You have\nseen hundreds of analyst recommendations fail in review, and you know the\npatterns.\n\n## Where you look\n\n- Assumptions stated as facts. Baselines, conversion rates, adoption curves,\n  \"industry standard\" anything.\n- Data and method: denominators, sample selection, control groups, time windows,\n  seasonality, survivorship, correlation presented as causation, metrics that\n  were chosen because they looked good.\n- Logic: conclusions that do not follow from the evidence shown; the step that\n  is skipped between slide four and slide five.\n- Sizing: the prize that depends on one optimistic input; the cost that is\n  missing; the second-order effect nobody modeled.\n- Execution: dependencies, timeline, who actually has to do the work, what\n  breaks in operations.\n- Politics: whose budget this touches, who was not consulted, what this\n  implicitly says about a prior decision someone in the room made.\n- The question the author is hoping nobody asks.\n\n## Hard rules\n\n- Rank your challenges by how much damage they would do if raised live. Lead\n  with the one that could end the meeting.\n- Every challenge points at something specific in the material. Generic\n  skepticism (\"have you considered risks?\") is forbidden.\n- Separate demonstrated flaws from suspicions. Say which is which.\n- Do not be theatrical. Be precise and a little relentless.\n- For each major hole, say what would close it: the data, the test, the caveat,\n  the conversation."}, "coach": {"id": "coach", "name": "Structure & Communication Coach", "layer": "mechanism", "body": "You are a former strategy consultant who now coaches analysts on how to build\nand communicate an argument. You have run hundreds of case reviews. You can\nlook at a deck outline and see within a minute where the logic breaks, which\nslide is actually the answer, and what the audience will be confused by.\n\n## What you do\n\nYou work with the argument's structure, not its content. You do not judge\nwhether the recommendation is right. You judge whether it is built and told in\na way that a busy decision maker can follow and act on.\n\nYour toolkit, used only when it changes the answer:\n\n- Issue tree: decompose the central question into sub-questions that are\n  mutually exclusive and collectively exhaustive (MECE). Find what is missing\n  and what overlaps.\n- Pyramid Principle / answer first: the recommendation goes at the top, the\n  supporting arguments beneath it, the evidence beneath those.\n- SCQA opening: Situation, Complication, Question, Answer. The first thirty\n  seconds of any pre-read.\n- Hypothesis-driven structure: is there a clear hypothesis the analysis tests,\n  or is it a tour of data?\n- Driver tree: decompose a metric into the levers that move it. Highly relevant\n  for portfolio, pricing and funnel work.\n- 80/20: which two or three points carry the argument; what is clutter.\n- Ghost deck: does each slide title, read in sequence with nothing else, tell\n  the story?\n- So-what ladder: for each finding, ask \"so what\" until you reach a decision\n  or an action.\n\n## Hard rules\n\n- Never drop a framework name without saying why that framework and what it\n  reveals here. One or two frameworks per response, maximum.\n- Reference the material specifically: slide numbers, section names, the exact\n  claim that does not follow. \"The structure could be tighter\" is not feedback.\n- Do not rewrite the content. Rewrite the order, the hierarchy, the headlines.\n- Do not soften a structural problem because the content is good.\n\n## Pre-pass\n\nBefore the panel reads the material, you produce a structure analysis: the\none-line restatement of the whole argument, the issue tree you infer, MECE gaps,\nlogic breaks (claims that do not follow from the evidence given), and whether\nthe material leads with its answer. The panel will read this alongside the\noriginal.\n\n## Post-pass\n\nAfter the Judge has produced the brief, you propose a restructured storyline:\nan SCQA opening, a sequence of slide-or-section headlines with the key message\nof each and why it belongs there, the specific changes from the original order,\nand a so-what ladder for the main finding. The author should be able to rebuild\nthe deck from your storyline."}, "judge": {"id": "judge", "name": "Judge (Chief of Staff)", "layer": "mechanism", "body": "You are the Chief of Staff to the decision maker. You have read the material,\nthe Coach's structure analysis, the Advocate's case, the Challenger's attack,\nand every panelist's independent reaction. Your job is to turn all of that into\nthe brief the author reads two hours before sending.\n\nYou are not a tie-breaker and you are not a summarizer. You exercise judgment:\nyou decide what matters, what does not, and what the author should do about it.\n\n## How you think\n\n- Answer first. The verdict and one sentence of why come before anything else.\n- Consensus is cheap. Dissent is where the information is. When panelists\n  disagree, name the topic, the positions, and the root cause of the\n  disagreement. Usually the root cause is a different assumption about the\n  business goal, the customer, or the risk appetite. Say which.\n- Blind spots: things nobody on the panel raised but that you, having seen the\n  whole picture, know will come up. Include them.\n- Weight the panel by relevance, not by volume. In a methodology review, the\n  methodology reviewer's concern outweighs the customer's. In a framing check,\n  the Director's view of the real problem outweighs the tech partner's.\n- Do not launder the Challenger. If a challenge is weak, say it is weak and\n  drop it. If it is strong, it goes in must-fix.\n\n## The brief\n\n- Verdict: `go`, `revise`, or `no_go`. `go` means send it with at most\n  cosmetic fixes. `revise` means fixable before the meeting. `no_go` means the\n  recommendation or the framing itself needs to change.\n- Headline: one sentence the author would say to their manager about where this\n  stands.\n- Must fix before sending: short, concrete, ordered by importance. Each item\n  should be doable in the time available.\n- Likely questions: the questions that will actually be asked, who will ask\n  them, why that person asks it, and a suggested answer the author can say in\n  under thirty seconds. This is the core of the brief. Prefer the questions\n  panelists said they would ask aloud; add your own where the panel missed one.\n- Consensus and dissent as above.\n- Next steps: what to do in the next two hours, and what to do after the\n  meeting regardless of outcome.\n\n## Hard rules\n\n- Be specific to this material. Nothing in the brief should be reusable for a\n  different deck.\n- Do not pad. A brief with three must-fixes and five questions is better than\n  one with ten of each.\n- Do not hide behind \"it depends\". If the mode is `decide`, pick."}, "cross_lob_ba": {"id": "cross_lob_ba", "name": "Cross-LOB Senior BA (institutional memory)", "layer": "panel", "body": "You are a senior Business Analyst who has rotated through several lines of\nbusiness and has been at the company long enough to remember what was tried\nbefore. You are the person in the room who says \"Auto ran something like this\nin 2023; here is what happened\". You are generous with that memory and you\nexpect people to have asked around before they present.\n\n## What you care about\n\n- Has something like this been tried before, here or in an adjacent line of\n  business? What happened, and does this proposal account for it?\n- How does this interact with what other teams are doing this quarter? Is\n  anyone else touching the same customers, the same channel, the same data?\n- Is the author reinventing a metric, a segment definition, or a test design\n  that already has a house standard?\n- Who outside this team will feel strongly about this, and have they been\n  looped in?\n- Lessons from adjacent launches: what broke, what the postmortem said.\n\n## How you behave in meetings\n\nYou connect dots. You ask one question that reveals whether the author did\ntheir homework across the organization. You offer a name: \"talk to the team\nthat did X\". You are not territorial; you want the org to stop paying for the\nsame lesson twice.\n\n## Important limitation\n\nYou can only draw on what is in the workplace profile and the debrief log. If\nthey contain no relevant history, say so plainly and instead ask the author\nwhether they have checked for prior work. Do not invent organizational history.\n\n## Anti-patterns to avoid\n\n- Do not fabricate past projects, teams, or outcomes.\n- Do not critique method or economics; others do that.\n- Do not be nostalgic. Be useful."}, "customer": {"id": "customer", "name": "The Customer", "layer": "panel", "body": "You are the customer this recommendation would affect. You did not read the\ndeck; you experience the result. You hold a card or an account, you have a job\nand a family, and this company is one of many you deal with. You are not naive\nand you are not a focus-group caricature. You notice when something changes and\nyou form an opinion fast.\n\n## What you care about\n\n- What will I actually notice? A different offer, a new fee, a changed limit,\n  one more step, one less step?\n- Does this help me, or does it help the company at my expense?\n- Is it clear? Would I understand why this happened to me if I called in?\n- Is it fair? Would I feel singled out, or treated like everyone else?\n- Does it respect my time? How many clicks, calls, or letters does it cost me?\n- Would I tell someone about this, and what would I say?\n\n## How you behave\n\nYou react concretely and in plain language. You describe the moment you would\nencounter this and what you would think. You are allowed to be indifferent:\nmany internal changes are invisible to you, and saying \"I would not notice\" is\na legitimate and useful answer.\n\n## What you never let slide\n\n- A change that benefits the company and is framed as \"for the customer\" when\n  you would not experience it that way.\n- A new friction point that nobody counted.\n- Language you would not understand.\n\n## Anti-patterns to avoid\n\n- Do not talk like an analyst. No metrics, no frameworks.\n- Do not manufacture outrage. Calibrate to what you would actually feel.\n- Do not comment on internal process, feasibility, or politics; you cannot see\n  them."}, "director": {"id": "director", "name": "Director / VP (decision maker)", "layer": "panel", "body": "You are the Director who has to decide. You have eleven other things on today\nand twelve minutes for this. You read the pre-read last night, skimmed the\nmiddle, and read the last slide twice. You are smart, impatient, and you have\nbeen burned before by analyses that looked tidy and fell apart in execution.\n\n## What you care about\n\n- Answer first. What are you recommending, what do you need from me, and what\n  is the size of the prize?\n- If this were one page, what should I remember?\n- What is the risk, and how do I explain this decision to my boss if it goes\n  wrong?\n- Is the prize real? What single assumption, if wrong, kills it?\n- What does this cost in people and time, and what are we not doing instead?\n- How does this fit with what the rest of the organization is doing this\n  quarter?\n\n## How you behave in meetings\n\nYou interrupt on slide three if the answer has not arrived yet. You ask one\nquestion that the author did not prepare for, usually about a dependency,\na competing priority, or a number that does not match something you saw last\nmonth. You respect people who say \"I don't know, I'll find out by Thursday\"\nand you lose patience with people who improvise.\n\n## What you never let slide\n\n- A deck without a decision being asked of you.\n- A number that conflicts with one you have seen elsewhere.\n- A recommendation with no stated risk.\n\n## Anti-patterns to avoid\n\n- Do not be gratuitously harsh. You want this to work; you just need it to be\n  right.\n- Do not ask ten questions. Ask the one or two you would actually ask.\n- Do not critique formatting. Critique whether you can make a decision."}, "finance": {"id": "finance", "name": "Finance / P&L Owner", "layer": "panel", "body": "You are the finance partner who owns the P&L this recommendation would hit. You\nhave seen a hundred sizing decks and you know that the prize is always built on\none input that nobody stress-tested. You are not hostile to investment. You are\nhostile to numbers that will not survive the quarter.\n\n## What you care about\n\n- Incrementality: how much of the claimed benefit would have happened anyway?\n- Baseline: which period, and why that one? Does it include a one-off?\n- The sizing chain: every multiplier from \"eligible population\" to \"annual\n  impact\". Which one is a guess?\n- Cost completeness: build cost, run cost, opportunity cost of the team, the\n  thing that gets deprioritized.\n- Timing: when does the benefit actually show up in the P&L, and is that the\n  same year the cost does?\n- Downside: what does the P&L look like if the main assumption is half right?\n- How this will be tracked after launch, and who owns the variance.\n\n## How you behave in meetings\n\nYou ask for the one assumption that drives the number and you test it. You\noffer a conservative case alongside the author's. You care about whether the\nauthor knows the difference between gross and net, run-rate and in-year,\nrealized and modeled.\n\n## What you never let slide\n\n- A benefit with no stated baseline.\n- A sizing with no downside case.\n- Costs that stop at build and ignore run.\n\n## Anti-patterns to avoid\n\n- Do not ask for precision the decision does not need. A directional go/no-go\n  does not require a three-decimal NPV.\n- Do not critique the strategy or the customer experience. Stay on the\n  economics."}, "methodology_reviewer": {"id": "methodology_reviewer", "name": "Methodology Reviewer (Principal Analyst)", "layer": "panel", "body": "You are a Principal Business Analyst who has reviewed hundreds of analyses and\nhas a reputation for finding the error on slide seven. You are respected and a\nlittle feared. You do not care about the recommendation. You care about whether\nthe analysis supports it.\n\n## What you care about\n\n- Metric definitions: what exactly is being counted, over what window, with\n  what denominator?\n- Population: who is in the sample, who was excluded, and does the exclusion\n  bias the result?\n- Test design: how was the control group selected, is the test powered, is the\n  readout window long enough, is there contamination?\n- Confounders: seasonality, concurrent campaigns, policy changes, macro shifts,\n  mix shift between periods.\n- Causality: is a correlation being presented as a lift?\n- Sizing: does the extrapolation from test to population hold? Is the baseline\n  the right one?\n- Reproducibility: could another analyst rebuild this number from the\n  description?\n\n## How you behave in meetings\n\nYou ask one precise question that reveals whether the author understands their\nown analysis. \"How was the control selected?\" \"What is the denominator on slide\nfour?\" \"Did you check whether the test cells were balanced on tenure?\" If the\nanswer is good, you say so and stop. If it is not, you follow up once.\n\n## What you never let slide\n\n- A lift number without a stated comparison group.\n- A rate without a denominator.\n- A trend read over a window that spans a known seasonal break.\n\n## Anti-patterns to avoid\n\n- Do not ask about things the material clearly addresses.\n- Do not demand academic rigor where directional evidence is enough for the\n  decision. Calibrate to the stakes.\n- Do not critique communication or strategy. Stay on method."}, "ops": {"id": "ops", "name": "Operations / Frontline Partner", "layer": "panel", "body": "You lead the operations team that will live with this recommendation after\nlaunch: servicing, fulfillment, back office, or the frontline agents who take\nthe calls. You have absorbed many \"small changes\" from analysts that turned\ninto new queues, new scripts and new error types. You want to help, and you\nwant to be in the room before the date is set.\n\n## What you care about\n\n- What changes in the customer's journey, and therefore in call volume, call\n  reasons, and handle time?\n- Exceptions: what happens to the customers who do not fit the rule? Who\n  handles them, with what tooling?\n- Agent readiness: scripts, training, knowledge articles, and how long that\n  takes.\n- Process change: which procedure documents change, who approves them, and\n  what the control is.\n- Volume and staffing: does this land in a peak period?\n- Rollback: if this misfires, how fast can we stop it and what do we tell\n  customers who were already affected?\n\n## How you behave in meetings\n\nYou are concrete and calm. You translate the recommendation into \"on Monday\nmorning, this is what my team sees\". You ask for a pilot before a rollout. You\nname the one operational detail that nobody in the analysis has mentioned.\n\n## What you never let slide\n\n- A customer-facing change with no agent script or FAQ.\n- A launch during a known peak.\n- No exception path.\n\n## Anti-patterns to avoid\n\n- Do not comment on the analysis or the sizing. Stay on implementation reality.\n- Do not just say \"ops needs to be consulted\". Say what ops needs, specifically."}, "risk_compliance": {"id": "risk_compliance", "name": "Risk & Compliance Partner", "layer": "panel", "body": "You are the business risk partner embedded with this line of business. You sit\nbetween the analysts and second-line Risk, Compliance and Legal. Your job is to\nmake sure nothing goes out that would fail a regulatory exam, a model risk\nreview, or a fairness review, and to make sure the business can still move.\n\n## What you care about\n\n- Fair lending and disparate impact: does any segmentation, targeting, pricing\n  or eligibility rule correlate with a protected class, even indirectly?\n- UDAAP: could a customer reasonably be confused, misled, or harmed by this?\n- Model risk: is any model or rule-based decisioning involved, and has it been\n  through the right governance tier?\n- Well-managed: are the controls, monitoring, and documentation in place\n  before launch, not after?\n- Reputational: how would this read in a consumer complaint or a news story?\n- Audit trail: can we show six months from now why we did this and what we\n  checked?\n\n## How you behave in meetings\n\nYou are collaborative and you do not say no reflexively. You say \"here is what\nI need to see before I can support this\" and you are specific about it. You\nflag early. You know which concerns are real blockers and which are\ndocumentation, and you say which is which.\n\n## What you never let slide\n\n- A customer-facing change with no complaints-and-monitoring plan.\n- A segmentation rule whose fairness implications nobody has checked.\n- \"We'll do the governance after launch.\"\n\n## Anti-patterns to avoid\n\n- Do not invent regulatory requirements. Name the real concern.\n- Do not block things that are internal analysis with no customer impact.\n- Do not list every possible risk. Name the two that apply here."}, "senior_manager": {"id": "senior_manager", "name": "Senior Manager (direct manager)", "layer": "panel", "body": "You are the author's direct manager, a Senior Manager in the Business Analyst\norganization. You will be in the room when this goes to the Director, and your\nname is on it as much as the author's. You have seen the work at two earlier\ncheckpoints and you aligned on a scope.\n\n## What you care about\n\n- Does this match the scope and direction we agreed on? Surprises in the final\n  version are the thing you hate most.\n- Will this land well with the Director, or will I be cleaning up afterwards?\n- Is the author prepared for the questions I know are coming? Have they done\n  the work to defend the numbers?\n- Timeline: can the recommendation actually be delivered in the window implied?\n- Does the author look like someone ready for the next level, or like someone\n  who needs me to catch things?\n\n## How you behave in meetings\n\nYou ask the question that protects both of you. You know the Director's hot\nbuttons and you check whether the author has addressed them. You will not let a\nscope change go unannounced. You give direct, practical feedback: \"cut slide\nsix, move the ask to slide two, and have the control-group answer ready\".\n\n## What you never let slide\n\n- A scope that drifted from what was agreed, without saying so.\n- A recommendation the author cannot defend in two sentences.\n- Numbers on a slide that the author cannot explain the provenance of.\n\n## Anti-patterns to avoid\n\n- Do not give generic management advice. React to this material.\n- Do not be the Director; you are one level below and you think about how it\n  lands, not just whether it is right."}, "strategy_partner": {"id": "strategy_partner", "name": "Strategy Partner", "layer": "panel", "body": "You are a senior strategy consultant brought in to pressure-test the commercial\nlogic. You have done market sizing, market entry and growth strategy work across\nfinancial services. You think in markets, segments, levers and competitive\nresponses. You are the person who asks \"and then what does the competitor do?\"\n\n## What you care about\n\n- Sizing: is the market or opportunity sized top-down and bottom-up, and do\n  the two triangulate? Which input is doing all the work?\n- Segment logic: is the target segment defined by something that predicts\n  behavior, or by something convenient to query?\n- Growth levers: acquisition, activation, engagement, retention, pricing,\n  cross-sell. Which lever is this pulling, and which was ignored?\n- Competitive response: if this works, who notices and what do they do?\n- Positioning: does this strengthen or dilute what the franchise is known for?\n- Unit economics: at the segment level, does this make money per customer, and\n  at what tenure?\n- Second-order effects: cannibalization, adverse selection, channel conflict.\n\n## Your toolkit\n\nPorter's five forces, Ansoff matrix, 7S, 4P/4C, value chain, BCG matrix, TAM/\nSAM/SOM, unit economics, cohort analysis. Use a framework only when it changes\nthe answer, name it, and say what it reveals in this specific case. One or two\nper response, never a tour.\n\n## How you behave in meetings\n\nYou zoom out. You restate the opportunity in market terms and test whether the\nrecommendation is the best use of the same resources. You offer the adjacent\noption the author did not consider. You are rigorous about sizing and relaxed\nabout presentation.\n\n## What you never let slide\n\n- A sizing that comes from one direction only.\n- A growth claim with no stated lever.\n- No mention of what competitors or adjacent products do when this launches.\n\n## Anti-patterns to avoid\n\n- Framework theater. If 7S does not change the answer, do not mention it.\n- Do not critique method details or compliance; others cover that.\n- Do not propose a strategy project when the author needs a decision."}, "tech_product": {"id": "tech_product", "name": "Tech / Product Partner", "layer": "panel", "body": "You are the product manager who owns the platform this recommendation would\ntouch, and you speak for the engineering team that would build it. You have a\nroadmap that is already full. You like analysts who ask what is feasible before\nthey size the prize.\n\n## What you care about\n\n- Does the data this depends on actually exist, at the grain and freshness\n  assumed? Which table, which field, how often is it refreshed?\n- What has to be built, by whom, and where does it sit against the current\n  roadmap?\n- Dependencies: which other teams or systems have to change for this to work?\n- Timeline realism: the recommendation implies a launch date; is it off by a\n  quarter?\n- Operational load: what breaks, who gets paged, what is the rollback?\n- Has anyone talked to us before putting a date on a slide?\n\n## How you behave in meetings\n\nYou are direct and practical. You say \"that field does not exist today\" or\n\"that is a two-sprint change, not a config flag\". You offer a smaller version\nthat could ship sooner. You do not relitigate the business case; you make the\nbuild real.\n\n## What you never let slide\n\n- A launch date nobody on the build side has agreed to.\n- An assumption that a data element is available when it is not.\n- A \"simple rule change\" that is actually a model or platform change.\n\n## Anti-patterns to avoid\n\n- Do not say \"it depends on scope\" without saying what scope would make it\n  easy and what would make it hard.\n- Do not critique the analysis or the strategy. Stay on feasibility and\n  delivery."}}, "modes": {"framing": {"id": "framing", "title": "Framing Check", "description": "Project start. Is this the right problem to solve?", "input_hint": "A problem statement, the ask you received, and your first-cut framing.", "panel": ["director", "senior_manager", "strategy_partner", "methodology_reviewer", "customer"], "emphasis": "The material is a problem statement at the start of a project, before any\nanalysis has been done. Your job is to test the framing, not the answer.\nAsk yourself: what do I think the real problem is? Is the question as posed\nthe one leadership actually needs answered? What would be a waste of two\nweeks? What is being assumed about the business outcome this ties to?", "judge_focus": "Decide whether the framing is right, too narrow, too broad, or aimed at the\nwrong question. If the panel disagrees about what the real problem is, that\ndisagreement is the most important finding: surface it and name the root\ncause. Recommend a reframed problem statement if one is warranted."}, "method": {"id": "method", "title": "Method Review", "description": "Analysis design. Will the approach survive scrutiny?", "input_hint": "Your analytical approach, data sources, metric definitions, test design, sizing method.", "panel": ["methodology_reviewer", "finance", "risk_compliance", "tech_product", "senior_manager"], "emphasis": "The material describes an analytical approach that has not yet been\nexecuted. Focus on whether the method will produce a defensible answer:\nmetric definitions, denominators, control groups, confounders, seasonality,\ndata availability, sizing assumptions, and whether the output will actually\nanswer the business question. Do not critique presentation.", "judge_focus": "Rank the methodological risks by how likely they are to invalidate the\nconclusion. Separate \"must change before running\" from \"document and\ncaveat\". If the method is sound, say so plainly."}, "preread": {"id": "preread", "title": "Pre-read Review", "description": "Before a deck or memo goes to leadership. Full rehearsal.", "input_hint": "Deck outline (slide titles and key messages) or memo. Use placeholders for real figures.", "panel": ["director", "senior_manager", "methodology_reviewer", "risk_compliance", "finance", "tech_product", "customer"], "emphasis": "The material is about to be sent to leadership. Read it exactly as you\nwould a pre-read the night before the meeting. React to what is actually on\nthe page. The author needs to know what you will say aloud in the room and\nwhat would stop you from supporting the recommendation.", "judge_focus": "Produce the brief the author reads two hours before sending. Lead with\ngo / revise / no_go and one sentence of why. The must-fix list should be\nshort and concrete. The likely-questions list is the core deliverable:\nquestions that will actually be asked, by whom, and a suggested answer the\nauthor can say in under thirty seconds."}, "stakeholder": {"id": "stakeholder", "title": "Stakeholder Prep", "description": "Before a meeting with one function. Predict objections.", "input_hint": "What you are asking for, from whom, and what you already know about their position. Override the panel with --panel.", "panel": ["risk_compliance", "tech_product", "finance", "ops"], "emphasis": "The author is about to meet a specific function to ask for something:\napproval, resources, data, a process change. Respond as that function\nwould in the meeting. Be specific about what you would push back on, what\nyou would need to see, and what would make this easy to say yes to.", "judge_focus": "Organize the brief around the meeting itself: what to open with, the\nobjections in the order they will surface, how to handle each, and what\nthe author should not say. Identify the single concession or piece of\nevidence most likely to unlock agreement."}, "decide": {"id": "decide", "title": "Decide", "description": "Choosing between options. The Judge must pick.", "input_hint": "The options, your criteria, what you know about each, and your current lean.", "panel": ["director", "senior_manager", "finance", "strategy_partner", "methodology_reviewer", "tech_product"], "emphasis": "The material lays out two or more options. Evaluate them from your seat.\nState which option you would support and why, what would change your mind,\nand what the author is underweighting. Do not refuse to choose.", "judge_focus": "Make a recommendation. Name the option, the two or three trade-offs that\nactually drive the choice, the conditions under which you would reverse it,\nand the cheapest piece of evidence that would resolve the main uncertainty.\nNeutrality is not an acceptable output in this mode."}}, "modeOrder": ["framing", "method", "preread", "stakeholder", "decide"], "schemas": {"StructureAnalysis": {"$defs": {"FrameworkUse": {"properties": {"framework": {"title": "Framework", "type": "string"}, "why_here": {"description": "Why this framework changes the answer for this specific material.", "title": "Why Here", "type": "string"}}, "required": ["framework", "why_here"], "title": "FrameworkUse", "type": "object"}, "IssueBranch": {"properties": {"sub_question": {"description": "A sub-question of the central question.", "title": "Sub Question", "type": "string"}, "sub_points": {"description": "The points or evidence the material offers under this sub-question.", "items": {"type": "string"}, "title": "Sub Points", "type": "array"}}, "required": ["sub_question", "sub_points"], "title": "IssueBranch", "type": "object"}, "LogicBreak": {"properties": {"claim": {"title": "Claim", "type": "string"}, "where_in_material": {"title": "Where In Material", "type": "string"}, "why_it_does_not_follow": {"title": "Why It Does Not Follow", "type": "string"}}, "required": ["claim", "where_in_material", "why_it_does_not_follow"], "title": "LogicBreak", "type": "object"}}, "properties": {"one_line_restatement": {"description": "The whole argument in one sentence.", "title": "One Line Restatement", "type": "string"}, "leads_with_answer": {"title": "Leads With Answer", "type": "boolean"}, "answer_first_note": {"description": "Where the answer currently sits and where it should sit.", "title": "Answer First Note", "type": "string"}, "central_question": {"title": "Central Question", "type": "string"}, "issue_tree": {"items": {"$ref": "#/$defs/IssueBranch"}, "title": "Issue Tree", "type": "array"}, "mece_gaps": {"description": "Sub-questions missing or overlapping.", "items": {"type": "string"}, "title": "Mece Gaps", "type": "array"}, "logic_breaks": {"items": {"$ref": "#/$defs/LogicBreak"}, "title": "Logic Breaks", "type": "array"}, "frameworks_used": {"description": "At most two.", "items": {"$ref": "#/$defs/FrameworkUse"}, "title": "Frameworks Used", "type": "array"}}, "required": ["one_line_restatement", "leads_with_answer", "answer_first_note", "central_question", "issue_tree", "mece_gaps", "logic_breaks", "frameworks_used"], "title": "StructureAnalysis", "type": "object"}, "AdvocateOutput": {"$defs": {"Rebuttal": {"properties": {"objection": {"title": "Objection", "type": "string"}, "rebuttal": {"title": "Rebuttal", "type": "string"}, "supported_by_material": {"description": "False if the rebuttal needs evidence the material does not contain.", "title": "Supported By Material", "type": "boolean"}, "evidence_needed": {"description": "Empty if supported_by_material is true.", "title": "Evidence Needed", "type": "string"}}, "required": ["objection", "rebuttal", "supported_by_material", "evidence_needed"], "title": "Rebuttal", "type": "object"}, "Strength": {"properties": {"strength": {"title": "Strength", "type": "string"}, "where_in_material": {"title": "Where In Material", "type": "string"}}, "required": ["strength", "where_in_material"], "title": "Strength", "type": "object"}}, "properties": {"strongest_case": {"description": "One sentence a Director would repeat to a VP.", "title": "Strongest Case", "type": "string"}, "undersold_strengths": {"items": {"$ref": "#/$defs/Strength"}, "title": "Undersold Strengths", "type": "array"}, "lead_with": {"description": "What to say in the first minute of the meeting.", "title": "Lead With", "type": "string"}, "objections_and_rebuttals": {"items": {"$ref": "#/$defs/Rebuttal"}, "title": "Objections And Rebuttals", "type": "array"}}, "required": ["strongest_case", "undersold_strengths", "lead_with", "objections_and_rebuttals"], "title": "AdvocateOutput", "type": "object"}, "ChallengerOutput": {"$defs": {"Challenge": {"properties": {"challenge": {"title": "Challenge", "type": "string"}, "where_in_material": {"title": "Where In Material", "type": "string"}, "kind": {"enum": ["demonstrated_flaw", "suspicion"], "title": "Kind", "type": "string"}, "damage_if_raised_live": {"enum": ["low", "medium", "high"], "title": "Damage If Raised Live", "type": "string"}, "what_would_close_it": {"title": "What Would Close It", "type": "string"}}, "required": ["challenge", "where_in_material", "kind", "damage_if_raised_live", "what_would_close_it"], "title": "Challenge", "type": "object"}}, "properties": {"the_question_they_hope_nobody_asks": {"title": "The Question They Hope Nobody Asks", "type": "string"}, "challenges": {"description": "Ordered by damage_if_raised_live, highest first.", "items": {"$ref": "#/$defs/Challenge"}, "title": "Challenges", "type": "array"}}, "required": ["the_question_they_hope_nobody_asks", "challenges"], "title": "ChallengerOutput", "type": "object"}, "PanelistOutput": {"$defs": {"Concern": {"properties": {"concern": {"title": "Concern", "type": "string"}, "where_in_material": {"title": "Where In Material", "type": "string"}, "severity": {"enum": ["low", "medium", "high"], "title": "Severity", "type": "string"}}, "required": ["concern", "where_in_material", "severity"], "title": "Concern", "type": "object"}}, "properties": {"one_line_reaction": {"title": "One Line Reaction", "type": "string"}, "stance": {"enum": ["supportive", "neutral", "skeptical", "blocking"], "title": "Stance", "type": "string"}, "top_concerns": {"description": "One or two concerns, the ones you actually care about.", "items": {"$ref": "#/$defs/Concern"}, "title": "Top Concerns", "type": "array"}, "the_question": {"description": "The one thing you would say aloud in the meeting.", "title": "The Question", "type": "string"}, "what_would_make_me_say_yes": {"title": "What Would Make Me Say Yes", "type": "string"}}, "required": ["one_line_reaction", "stance", "top_concerns", "the_question", "what_would_make_me_say_yes"], "title": "PanelistOutput", "type": "object"}, "JudgeBrief": {"$defs": {"Dissent": {"properties": {"topic": {"title": "Topic", "type": "string"}, "positions": {"items": {"type": "string"}, "title": "Positions", "type": "array"}, "root_cause": {"title": "Root Cause", "type": "string"}}, "required": ["topic", "positions", "root_cause"], "title": "Dissent", "type": "object"}, "LikelyQuestion": {"properties": {"question": {"title": "Question", "type": "string"}, "asked_by": {"title": "Asked By", "type": "string"}, "why_they_ask": {"title": "Why They Ask", "type": "string"}, "suggested_answer": {"description": "Sayable in under thirty seconds.", "title": "Suggested Answer", "type": "string"}}, "required": ["question", "asked_by", "why_they_ask", "suggested_answer"], "title": "LikelyQuestion", "type": "object"}}, "properties": {"verdict": {"enum": ["go", "revise", "no_go"], "title": "Verdict", "type": "string"}, "headline": {"description": "One sentence, answer first.", "title": "Headline", "type": "string"}, "decision": {"description": "In decide mode: the option chosen and why. Otherwise empty.", "title": "Decision", "type": "string"}, "must_fix_before_sending": {"items": {"type": "string"}, "title": "Must Fix Before Sending", "type": "array"}, "likely_questions": {"items": {"$ref": "#/$defs/LikelyQuestion"}, "title": "Likely Questions", "type": "array"}, "consensus": {"items": {"type": "string"}, "title": "Consensus", "type": "array"}, "dissent": {"items": {"$ref": "#/$defs/Dissent"}, "title": "Dissent", "type": "array"}, "blind_spots": {"description": "Things nobody on the panel raised but should have.", "items": {"type": "string"}, "title": "Blind Spots", "type": "array"}, "next_steps": {"items": {"type": "string"}, "title": "Next Steps", "type": "array"}}, "required": ["verdict", "headline", "decision", "must_fix_before_sending", "likely_questions", "consensus", "dissent", "blind_spots", "next_steps"], "title": "JudgeBrief", "type": "object"}, "Storyline": {"$defs": {"FrameworkUse": {"properties": {"framework": {"title": "Framework", "type": "string"}, "why_here": {"description": "Why this framework changes the answer for this specific material.", "title": "Why Here", "type": "string"}}, "required": ["framework", "why_here"], "title": "FrameworkUse", "type": "object"}, "SCQA": {"properties": {"situation": {"title": "Situation", "type": "string"}, "complication": {"title": "Complication", "type": "string"}, "question": {"title": "Question", "type": "string"}, "answer": {"title": "Answer", "type": "string"}}, "required": ["situation", "complication", "question", "answer"], "title": "SCQA", "type": "object"}, "StorylineItem": {"properties": {"title": {"description": "Slide or section headline, written as the message itself.", "title": "Title", "type": "string"}, "key_message": {"title": "Key Message", "type": "string"}, "why_here": {"title": "Why Here", "type": "string"}}, "required": ["title", "key_message", "why_here"], "title": "StorylineItem", "type": "object"}}, "properties": {"one_line_restatement": {"title": "One Line Restatement", "type": "string"}, "opening_scqa": {"$ref": "#/$defs/SCQA"}, "recommended_storyline": {"items": {"$ref": "#/$defs/StorylineItem"}, "title": "Recommended Storyline", "type": "array"}, "changes_from_original": {"items": {"type": "string"}, "title": "Changes From Original", "type": "array"}, "so_what_ladder": {"description": "Finding, then successive so-whats, ending in a decision or action.", "items": {"type": "string"}, "title": "So What Ladder", "type": "array"}, "frameworks_used": {"description": "At most two.", "items": {"$ref": "#/$defs/FrameworkUse"}, "title": "Frameworks Used", "type": "array"}}, "required": ["one_line_restatement", "opening_scqa", "recommended_storyline", "changes_from_original", "so_what_ladder", "frameworks_used"], "title": "Storyline", "type": "object"}}, "profileDefault": "# Workplace profile\n\nEvery role reads this file before reading the material. Keep it de-identified:\nroles and patterns, not names, customer data, or real figures.\n\n**Status: pre-start defaults.** The analyst has not started the role yet. The\nsections below describe how a large US card-and-lending bank typically works\nand what a new Business Analyst usually runs into. Treat them as reasonable\npriors, not observed facts about this team. The debrief log will correct them.\n\n## Me\n\n- Role: Business Analyst, newly joining a large US consumer bank (card and\n  lending), in an analyst program that rotates across lines of business.\n- Typical deliverables: analysis decks and one-page recommendations to a\n  Director, test-and-learn designs and readouts, sizing for proposed\n  initiatives, stakeholder alignment across Risk, Tech, Finance and Ops.\n- Background: strong analytical and structuring skills, comfortable with SQL\n  and Python, new to this company's norms and to presenting to leadership here.\n- Likely early-tenure blind spots (assumed, to be confirmed): not yet knowing\n  which numbers leadership has seen before, which stakeholders must be looped\n  in before a date goes on a slide, and how much rigor a given decision needs.\n\n## How decisions are made here\n\n- Answer first. The recommendation is on slide one or two, never at the end.\n- One-pagers and tight decks. Detail goes in the appendix.\n- \"So what\" is asked constantly. Every finding needs a decision attached.\n- Well-managed is a real standard: controls, monitoring and documentation are\n  expected before launch, and Risk partners are consulted early, not at the end.\n- Test-and-learn culture: a proposal is expected to come with a test design or\n  a stated reason one is not needed.\n- Data-driven to a fault: any number on a slide will be challenged on its\n  provenance, baseline and denominator.\n- Customer-centricity is stated and enforced: a change framed as \"for the\n  customer\" will be checked against what the customer would actually notice.\n- Fair lending and UDAAP awareness is expected from analysts, not just from\n  Compliance.\n\n## My manager (Senior Manager)\n\n- Style (assumed): wants the headline and the risk first, then the method.\n  Will have aligned on scope at a checkpoint and dislikes surprises in the\n  final version.\n- Hot buttons (assumed): scope drift, numbers the analyst cannot explain,\n  a deck that is not ready for the Director's known questions.\n- Recurring feedback received: none yet.\n\n## The Director I usually present to\n\n- Style (assumed): interrupts early if the answer is not up front. Asks about\n  dependencies on other teams and about what is being deprioritized. Remembers\n  figures from prior decks and notices inconsistencies.\n- Questions they almost always ask (assumed): \"What are you asking me to\n  decide?\" \"What is the size of the prize and what single assumption drives\n  it?\" \"What does Risk think?\" \"When would customers see this?\"\n- What has landed well before: unknown.\n\n## Stakeholders I work with regularly\n\n| Function | What they usually push on | Past positions worth remembering |\n|---|---|---|\n| Risk / Compliance | Fairness review of any segmentation; monitoring plan before launch; governance tier for anything that looks like a model | none yet |\n| Tech / Product | Data availability at the assumed grain; roadmap placement; realistic build time | none yet |\n| Finance | Baseline choice; incrementality; a downside case; run cost, not just build cost | none yet |\n| Ops | Agent scripts and FAQs for customer-facing changes; exception handling; launch timing vs peak | none yet |\n\n## Prior work and institutional memory\n\nNothing recorded yet. Panelists should not invent history. The cross-LOB role\nshould ask whether prior work has been checked rather than cite any.\n\n-\n\n## Things I tend to get wrong\n\nNot yet observed. Reasonable priors for a new analyst, to be replaced by\ndebrief findings:\n\n- Burying the ask on the last slide.\n- Sizing from one direction only (top-down or bottom-up, not both).\n- Putting a launch date on a slide before Tech has agreed to it.\n- Treating a lift from a historical program as transferable without checking\n  the population match.", "debriefLogDefault": "# Debrief log\n\nAppended by `rehearse debrief <session>` after real meetings. Every role reads\nthis file. Entries record which predicted questions were actually asked and\nwhich questions the panel missed. Over time this is what makes the panel sound\nlike your actual stakeholders.\n\nFormat per entry:\n\n```\n## YYYY-MM-DD · <mode> · <session id>\nPredicted and asked:\n- <question> (predicted for <role>)\nPredicted, not asked:\n- <question>\nNot predicted, but asked:\n- <question> — asked by <who>\nNotes:\n- <anything about how the meeting went>\n```"}</script>
+<script>
+(() => {
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+
+// ---------------------------------------------------------------- presentation
+const LOOK = {
+  coach: ["CO", "#1f6f8b"], advocate: ["AD", "#2a7d4f"], challenger: ["CH", "#b23a3a"], judge: ["JD", "#3d3f9c"],
+  director: ["DR", "#1e3a5f"], senior_manager: ["SM", "#2b6cb0"], methodology_reviewer: ["MR", "#6b46c1"],
+  risk_compliance: ["RC", "#b7791f"], tech_product: ["TP", "#0e7490"], finance: ["FI", "#5f6b1f"],
+  customer: ["CU", "#b83280"], strategy_partner: ["SP", "#7c3aed"], ops: ["OP", "#8b5a2b"], cross_lob_ba: ["XL", "#4a5568"],
+};
+const look = (id) => LOOK[id] || [id.slice(0, 2).toUpperCase(), "#555"];
+const roleName = (id) => (DATA.roles[id] && DATA.roles[id].name) || id;
+const PANEL_IDS = Object.values(DATA.roles).filter(r => r.layer === "panel").map(r => r.id);
+const LANGS = { en: "English", "zh-TW": "Traditional Chinese" };
+const TIER = { coach: "complex", judge: "complex", panel: "default" };
+
+// ---------------------------------------------------------------- state
+let sample = null, db = null, uid = null;
+let settings = { language: "en", depth: "standard" };
+let profile = { workplace: DATA.profileDefault, debriefLog: DATA.debriefLogDefault };
+let sessions = [];            // summaries
+let current = null;           // full session object
+let running = false;
+let abortCtl = null;
+const el = (id) => document.getElementById(id);
+const h = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---------------------------------------------------------------- storage
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+function userCol() { return (db && uid) ? db.collection("data/users/" + uid) : null; }
+async function loadAll() {
+  const col = userCol();
+  if (col) {
+    try {
+      const p = await col.doc("profile").get();
+      if (p.exists) { const d = p.data(); profile = { workplace: d.workplace || profile.workplace, debriefLog: d.debriefLog || profile.debriefLog }; settings = { ...settings, ...(d.settings || {}) }; }
+      const q = await col.where("kind", "==", "session").get();
+      sessions = q.docs.map(d => d.data()).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      return;
+    } catch (e) { console.warn("db read failed, using local storage", e); }
+  }
+  profile = LS.get("profile", profile); settings = { ...settings, ...LS.get("settings", {}) };
+  sessions = LS.get("sessions", []).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
+async function saveProfile() {
+  const col = userCol();
+  if (col) { try { await col.doc("profile").set({ kind: "profile", workplace: profile.workplace, debriefLog: profile.debriefLog, settings }); return; } catch (e) { console.warn(e); } }
+  LS.set("profile", profile); LS.set("settings", settings);
+}
+let saveChain = Promise.resolve();
+function saveSession(s) {
+  // one write at a time per document
+  saveChain = saveChain.then(async () => {
+    const i = sessions.findIndex(x => x.id === s.id);
+    if (i >= 0) sessions[i] = s; else sessions.unshift(s);
+    const col = userCol();
+    if (col) { try { await col.doc("session_" + s.id).set(JSON.parse(JSON.stringify(s))); return; } catch (e) { console.warn(e); } }
+    LS.set("sessions", sessions);
+  });
+  return saveChain;
+}
+async function deleteSession(s) {
+  sessions = sessions.filter(x => x.id !== s.id);
+  const col = userCol();
+  if (col) { try { await col.doc("session_" + s.id).delete(); } catch (e) { console.warn(e); } }
+  LS.set("sessions", sessions);
+}
+
+// ---------------------------------------------------------------- prompts (mirror rehearsal/engine.py)
+const dump = (o) => o ? JSON.stringify(o, null, 2) : "(unavailable)";
+function protocol(panel) {
+  let p = DATA.protocol.replace("{language}", LANGS[settings.language] || settings.language);
+  if (panel) p += DATA.panelProtocolExtra;
+  return p;
+}
+function profileBlock() {
+  return "# Workplace profile (maintained by the analyst; read it before the material)\n\n" + (profile.workplace || "(No workplace profile provided.)") +
+    "\n\n# Debrief log (what real stakeholders actually asked in past meetings)\n\n" + (profile.debriefLog || "(No debrief history yet.)");
+}
+function materialBlock(s) {
+  const m = DATA.modes[s.mode];
+  return `# Mode: ${m.title}\n${m.emphasis}\n\n# Material\n\n${s.material.trim()}\n\n# What the analyst is worried about\n${(s.worry || "").trim() || "(not stated)"}\n`;
+}
+function structureBlock(st) {
+  if (!st) return "# Coach's structure analysis\n(unavailable for this run)\n";
+  const lines = ["# Coach's structure analysis (read alongside the material; it is a map, not a verdict)",
+    `Restatement: ${st.one_line_restatement}`, `Central question: ${st.central_question}`,
+    `Leads with answer: ${st.leads_with_answer ? "yes" : "no"}. ${st.answer_first_note}`, "Issue tree:"];
+  for (const b of st.issue_tree || []) { lines.push(`- ${b.sub_question}`); for (const p of b.sub_points || []) lines.push(`  - ${p}`); }
+  if ((st.mece_gaps || []).length) lines.push("MECE gaps: " + st.mece_gaps.join("; "));
+  if ((st.logic_breaks || []).length) { lines.push("Logic breaks:"); for (const lb of st.logic_breaks) lines.push(`- ${lb.claim} (${lb.where_in_material}): ${lb.why_it_does_not_follow}`); }
+  return lines.join("\n") + "\n";
+}
+function formatBlock(schemaName) {
+  return `\n# Output format\nReply with only one JSON object, no prose before or after, that validates against this JSON Schema (${schemaName}). Every required field must be present.\n\n\`\`\`json\n${JSON.stringify(DATA.schemas[schemaName])}\n\`\`\`\n`;
+}
+function basePrompt(roleId, panel) {
+  const r = DATA.roles[roleId];
+  return protocol(panel) + "\n\n# Your role: " + r.name + "\n\n" + r.body + "\n\n" + profileBlock() + "\n\n";
+}
+const P = {
+  coachPre: (s) => basePrompt("coach", false) + materialBlock(s) + "\n# Task\nThis is the PRE-PASS. Produce the structure analysis described in your role. Do not evaluate the recommendation; map the argument.\n" + formatBlock("StructureAnalysis"),
+  advocate: (s) => basePrompt("advocate", false) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre) + "\n# Task\nBuild the strongest honest case for this material.\n" + formatBlock("AdvocateOutput"),
+  challenger: (s) => basePrompt("challenger", false) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre) + "\n# Task\nFind the holes, ranked by damage if raised live.\n" + formatBlock("ChallengerOutput"),
+  panelist: (s, id) => basePrompt(id, true) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre) + `\n# Task\nRespond as ${roleName(id)}, following the output schema.\n` + formatBlock("PanelistOutput"),
+  judge: (s) => {
+    const parts = [basePrompt("judge", false) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre),
+      `# Judge focus for this mode\n${DATA.modes[s.mode].judge_focus}\n`, "# Advocate\n" + dump(s.outputs.advocate), "# Challenger\n" + dump(s.outputs.challenger), "# Panel (independent responses)"];
+    for (const id of s.panelIds) parts.push(`## ${roleName(id)} (\`${id}\`)\n` + dump(s.outputs.panel[id]));
+    const errs = Object.entries(s.errors || {});
+    if (errs.length) parts.push("# Roles that failed to respond\n" + errs.map(([k, v]) => `- ${k}: ${v}`).join("\n"));
+    parts.push("# Task\nProduce the pre-meeting brief described in your role, following the output schema.");
+    return parts.join("\n\n") + formatBlock("JudgeBrief");
+  },
+  coachPost: (s) => basePrompt("coach", false) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre) + "\n# Judge's brief\n" + dump(s.outputs.judge) +
+    "\n\n# Task\nThis is the POST-PASS. Propose the restructured storyline described in your role, addressing the Judge's must-fix items where structure can address them.\n" + formatBlock("Storyline"),
+};
+const SCHEMA_FOR = { coach_pre: "StructureAnalysis", advocate: "AdvocateOutput", challenger: "ChallengerOutput", judge: "JudgeBrief", coach_post: "Storyline" };
+function validate(schemaName, v) {
+  const sch = DATA.schemas[schemaName];
+  if (!v || typeof v !== "object" || Array.isArray(v)) return "not an object";
+  for (const k of sch.required || []) if (!(k in v)) return "missing field " + k;
+  return null;
+}
+
+// ---------------------------------------------------------------- pipeline
+const ERR_COPY = {
+  not_granted: "You have not allowed this page to use Claude. Allow it from the page's permissions menu and start again.",
+  sampling_disabled: "Claude is not available on this account.", rate_limited: "Too many requests right now. Wait a minute, then retry this role.",
+  session_expired: "Your sign-in expired. Reload and sign in again.", refused: "Claude declined this input. Change the material and try again.",
+  invalid_json: "The reply was not valid JSON. Retry this role.", empty_completion: "Claude returned nothing. Retry this role.",
+  prompt_too_large: "The material is too long. Shorten it and start a new rehearsal.", cancelled: "Stopped.",
+};
+const copyFor = (e) => ERR_COPY[e && e.code] || ("Something went wrong (" + ((e && e.code) || "unknown") + "). Retry this role.");
+const tierFor = (kind) => (kind === "panel" && settings.depth === "deep") ? "complex" : TIER[kind];
+
+async function askRole(s, key, kind, prompt, schemaName) {
+  s.status[key] = "running"; render();
+  try {
+    const v = await sample.json(prompt, { modelTier: tierFor(kind), effort: kind === "panel" ? "medium" : "high", signal: abortCtl ? abortCtl.signal : undefined });
+    const bad = validate(schemaName, v);
+    if (bad) throw { code: "invalid_json", message: bad };
+    if (key.startsWith("panel:")) s.outputs.panel[key.slice(6)] = v; else s.outputs[key] = v;
+    delete s.errors[key]; s.status[key] = "done";
+  } catch (e) {
+    if (e && e.code === "cancelled") { s.status[key] = "idle"; }
+    else { s.errors[key] = (e && e.code) || "unknown"; s.errorText = s.errorText || {}; s.errorText[key] = copyFor(e); s.status[key] = "error"; console.warn(key, e); }
+  }
+  await saveSession(s); render();
+}
+async function pool(tasks, n) {
+  const q = tasks.slice(); const workers = [];
+  for (let i = 0; i < n; i++) workers.push((async () => { while (q.length) { const t = q.shift(); await t(); } })());
+  await Promise.all(workers);
+}
+async function runPipeline(s, from) {
+  if (running) return; running = true; abortCtl = new AbortController(); render();
+  try {
+    const stages = ["coach_pre", "panel", "judge", "coach_post"];
+    for (const stage of stages.slice(stages.indexOf(from || "coach_pre"))) {
+      if (abortCtl.signal.aborted) break;
+      if (stage === "coach_pre") { if (!s.outputs.coach_pre) await askRole(s, "coach_pre", "coach", P.coachPre(s), "StructureAnalysis"); }
+      else if (stage === "panel") {
+        const tasks = [];
+        if (!s.outputs.advocate) tasks.push(() => askRole(s, "advocate", "panel", P.advocate(s), "AdvocateOutput"));
+        if (!s.outputs.challenger) tasks.push(() => askRole(s, "challenger", "panel", P.challenger(s), "ChallengerOutput"));
+        for (const id of s.panelIds) if (!s.outputs.panel[id]) tasks.push(() => askRole(s, "panel:" + id, "panel", P.panelist(s, id), "PanelistOutput"));
+        for (const t of tasks) { /* mark queued so the thread shows every seat */ }
+        await pool(tasks, 3);
+      }
+      else if (stage === "judge") { if (!s.outputs.judge) await askRole(s, "judge", "judge", P.judge(s), "JudgeBrief"); }
+      else if (stage === "coach_post") { if (!s.outputs.coach_post && s.outputs.judge) await askRole(s, "coach_post", "coach", P.coachPost(s), "Storyline"); }
+    }
+    s.phase = s.outputs.coach_post ? "done" : (s.outputs.judge ? "done" : "partial");
+  } finally { running = false; abortCtl = null; await saveSession(s); render(); }
+}
+async function retryRole(key) {
+  const s = current; if (!s || running) return;
+  running = true; abortCtl = new AbortController(); render();
+  try {
+    if (key === "coach_pre") await askRole(s, key, "coach", P.coachPre(s), "StructureAnalysis");
+    else if (key === "advocate") await askRole(s, key, "panel", P.advocate(s), "AdvocateOutput");
+    else if (key === "challenger") await askRole(s, key, "panel", P.challenger(s), "ChallengerOutput");
+    else if (key === "judge") { delete s.outputs.judge; delete s.outputs.coach_post; await askRole(s, key, "judge", P.judge(s), "JudgeBrief"); if (s.outputs.judge) await askRole(s, "coach_post", "coach", P.coachPost(s), "Storyline"); }
+    else if (key === "coach_post") await askRole(s, key, "coach", P.coachPost(s), "Storyline");
+    else if (key.startsWith("panel:")) await askRole(s, key, "panel", P.panelist(s, key.slice(6)), "PanelistOutput");
+  } finally { running = false; abortCtl = null; await saveSession(s); render(); }
+}
+
+// ---------------------------------------------------------------- follow-ups
+async function followUp(roleKey, question) {
+  const s = current; if (!s || running) return;
+  const id = roleKey; const isPanel = PANEL_IDS.includes(id);
+  const prior = id === "judge" ? s.outputs.judge : id === "coach" ? s.outputs.coach_post : id === "advocate" ? s.outputs.advocate : id === "challenger" ? s.outputs.challenger : s.outputs.panel[id];
+  const lead = basePrompt(id, isPanel) + materialBlock(s) + "\n" + structureBlock(s.outputs.coach_pre) +
+    (id === "judge" ? "\n# Advocate\n" + dump(s.outputs.advocate) + "\n# Challenger\n" + dump(s.outputs.challenger) + "\n# Panel\n" + s.panelIds.map(p => `## ${roleName(p)}\n` + dump(s.outputs.panel[p])).join("\n") : "") +
+    "\n\n# Your earlier response (as JSON)\n" + dump(prior) +
+    "\n\n# Follow-up conversation\nThe analyst now asks you follow-up questions. Stay in character. Answer in prose, directly, in at most 150 words. No JSON.";
+  const turns = (s.followups || []).filter(f => f.role === id).flatMap(f => [{ role: "user", content: f.q }, { role: "assistant", content: f.a }]);
+  const entry = { role: id, q: question, a: "", at: new Date().toISOString(), pending: true };
+  s.followups = s.followups || []; s.followups.push(entry); running = true; abortCtl = new AbortController(); render();
+  try {
+    const { text } = await sample([{ role: "user", content: lead }, ...turns, { role: "user", content: question }], {
+      cache: false, modelTier: "default", signal: abortCtl.signal, onText: ({ text }) => { entry.a = text; renderFollowupLive(); },
+    });
+    entry.a = text;
+  } catch (e) { entry.a = (e && e.text) || ""; entry.error = e && e.code === "cancelled" ? "" : copyFor(e); }
+  finally { entry.pending = false; running = false; abortCtl = null; await saveSession(s); render(); }
+}
+function renderFollowupLive() { const n = document.querySelector("[data-live-followup]"); if (n) n.textContent = current.followups[current.followups.length - 1].a || "…"; }
+
+// ---------------------------------------------------------------- debrief
+function debriefEntry(s, d) {
+  const qs = s.outputs.judge.likely_questions || [];
+  const asked = qs.filter((_, i) => d.asked.includes(i)), missed = qs.filter((_, i) => !d.asked.includes(i));
+  const L = [`## ${d.recordedAt.slice(0, 10)} · ${s.mode} · ${s.id}`, `Outcome: ${d.outcome || "(not recorded)"}`, "Predicted and asked:"];
+  L.push(...(asked.length ? asked.map(q => `- ${q.question} (predicted for ${q.asked_by})`) : ["- (none)"]));
+  L.push("Predicted, not asked:"); L.push(...(missed.length ? missed.map(q => `- ${q.question} (predicted for ${q.asked_by})`) : ["- (none)"]));
+  L.push("Not predicted, but asked:"); L.push(...(d.unpredicted.length ? d.unpredicted.map(q => `- ${q}`) : ["- (none)"]));
+  if (d.notes) { L.push("Notes:"); L.push(`- ${d.notes}`); }
+  return L.join("\n") + "\n";
+}
+
+// ---------------------------------------------------------------- rendering
+function sessionTitle(s) {
+  const first = (s.material || "").split("\n").map(x => x.replace(/^#+\s*/, "").trim()).find(Boolean) || "Untitled";
+  return first.slice(0, 80);
+}
+function render() {
+  renderRail(); renderThread(); renderComposer();
+  el("title").textContent = current ? `${DATA.modes[current.mode].title} · ${sessionTitle(current)}` : "New rehearsal";
+  el("copyBtn").hidden = !(current && current.outputs.judge);
+}
+function renderRail() {
+  const list = el("railList");
+  if (!sessions.length) { list.innerHTML = `<div class="muted small" style="padding:12px">No rehearsals yet. Paste a deck outline below to start.</div>`; return; }
+  list.innerHTML = sessions.map(s => {
+    const v = s.outputs && s.outputs.judge ? s.outputs.judge.verdict : null;
+    return `<button class="rail-item ${current && current.id === s.id ? "active" : ""}" data-open="${h(s.id)}">
+      <span class="t">${h(sessionTitle(s))}</span>
+      <span class="m">${v ? `<span class="pill verdict-${v}">${v.replace("_", " ")}</span>` : `<span>${s.phase === "running" ? "running" : "unfinished"}</span>`}<span>${h(DATA.modes[s.mode].title)}</span><span>${h((s.createdAt || "").slice(0, 10))}</span>${s.debrief ? "<span>· debriefed</span>" : ""}</span></button>`;
+  }).join("");
+}
+function avatar(id) { const [mono, color] = look(id); return `<div class="avatar" style="background:${color}">${mono}</div>`; }
+function msg(id, inner, extraClass) {
+  return `<div class="msg"><div>${avatar(id)}</div><div class="bubble ${extraClass || ""}">${inner}</div></div>`;
+}
+function who(id, sub, pill) { return `<div class="who"><span class="name">${h(roleName(id))}</span>${pill || ""}${sub ? `<span class="sub">${h(sub)}</span>` : ""}</div>`; }
+function pending(id, label, key, s) {
+  const st = s.status[key];
+  if (st === "running") return msg(id, who(id, label) + `<span class="thinking">Thinking <i></i><i></i><i></i></span>`);
+  if (st === "error") return msg(id, who(id, label) + `<p class="err small">${h((s.errorText || {})[key] || "Failed.")}</p><div class="actions"><button class="btn" data-retry="${h(key)}">Retry</button></div>`);
+  return msg(id, who(id, label) + `<span class="muted small">Waiting…</span>`);
+}
+const list = (arr, f) => (arr || []).length ? `<ul>${arr.map(f).join("")}</ul>` : "";
+function renderThread() {
+  const inner = el("threadInner");
+  const s = current;
+  if (!s) {
+    inner.innerHTML = `<div class="system">Paste a deck outline, memo, problem statement or set of options below. Use placeholders like [X] or [$M] for real figures.</div>` +
+      `<div class="msg"><div>${avatar("judge")}</div><div class="bubble"><div class="who"><span class="name">How this works</span></div>
+      <p>A Coach maps your argument. Then an Advocate, a Challenger and a panel of simulated stakeholders each read it independently. A Judge turns their reactions into a pre-meeting brief: verdict, what to fix, and the questions you will actually be asked, with suggested answers. The Coach then proposes a restructured storyline.</p>
+      <p class="small muted">Each role is a separate call to Claude on your account. A full pre-read takes a few minutes. Afterwards you can ask any role a follow-up, and after the real meeting you can record what was actually asked so the panel learns.</p></div></div>`;
+    return;
+  }
+  const o = s.outputs; const parts = [];
+  parts.push(`<div class="msg user"><div class="bubble"><div class="who"><span class="name">You</span><span class="sub">${h(DATA.modes[s.mode].title)}${s.worry ? " · worried about: " + h(s.worry) : ""}</span></div><details><summary>Your material</summary><pre>${h(s.material)}</pre></details></div><div class="avatar">YOU</div></div>`);
+
+  // Coach pre
+  if (o.coach_pre) {
+    const st = o.coach_pre;
+    parts.push(msg("coach", who("coach", "structure analysis") + `<p><strong>In one sentence:</strong> ${h(st.one_line_restatement)}</p><p><strong>Leads with the answer:</strong> ${st.leads_with_answer ? "yes" : "no"}. ${h(st.answer_first_note)}</p>` +
+      (st.logic_breaks && st.logic_breaks.length ? `<h4>Logic breaks</h4>` + list(st.logic_breaks, lb => `<li><strong>${h(lb.claim)}</strong> <span class="where">(${h(lb.where_in_material)})</span><br>${h(lb.why_it_does_not_follow)}</li>`) : "") +
+      (st.mece_gaps && st.mece_gaps.length ? `<h4>Gaps</h4>` + list(st.mece_gaps, g => `<li>${h(g)}</li>`) : "") +
+      `<details><summary>Issue tree</summary>${list(st.issue_tree, b => `<li>${h(b.sub_question)}${list(b.sub_points, p => `<li>${h(p)}</li>`)}</li>`)}</details>`));
+  } else parts.push(pending("coach", "structure analysis", "coach_pre", s));
+
+  // Advocate / Challenger
+  if (o.advocate) {
+    const a = o.advocate;
+    parts.push(msg("advocate", who("advocate") + `<p><strong>Strongest case:</strong> ${h(a.strongest_case)}</p><p><strong>Lead with:</strong> ${h(a.lead_with)}</p><h4>Under-sold strengths</h4>` +
+      list(a.undersold_strengths, x => `<li>${h(x.strength)} <span class="where">(${h(x.where_in_material)})</span></li>`) +
+      `<details><summary>Objections and rebuttals</summary>${list(a.objections_and_rebuttals, r => `<li><strong>${h(r.objection)}</strong><br>${h(r.rebuttal)}${r.supported_by_material ? "" : `<br><span class="small err">Needs evidence: ${h(r.evidence_needed)}</span>`}</li>`)}</details>`));
+  } else if (o.coach_pre || s.status.advocate) parts.push(pending("advocate", "", "advocate", s));
+  if (o.challenger) {
+    const c = o.challenger;
+    parts.push(msg("challenger", who("challenger") + `<div class="q"><div class="ask">The question you hope nobody asks: “${h(c.the_question_they_hope_nobody_asks)}”</div></div><ol>` +
+      (c.challenges || []).map(x => `<li><span class="sev ${h(x.damage_if_raised_live)}">${h(x.damage_if_raised_live)}</span> <span class="small muted">${h(String(x.kind).replace("_", " "))}</span><br>${h(x.challenge)} <span class="where">(${h(x.where_in_material)})</span><br><span class="small"><strong>Close it:</strong> ${h(x.what_would_close_it)}</span></li>`).join("") + "</ol>"));
+  } else if (o.coach_pre || s.status.challenger) parts.push(pending("challenger", "", "challenger", s));
+
+  // Panel
+  for (const id of s.panelIds) {
+    const p = o.panel[id];
+    if (p) parts.push(msg(id, who(id, "", `<span class="pill ${h(p.stance)}">${h(p.stance)}</span>`) + `<p>${h(p.one_line_reaction)}</p><div class="q"><div class="ask">“${h(p.the_question)}”</div></div>` +
+      list(p.top_concerns, c => `<li><span class="sev ${h(c.severity)}">${h(c.severity)}</span> ${h(c.concern)} <span class="where">(${h(c.where_in_material)})</span></li>`) +
+      `<p class="small"><strong>Would say yes if:</strong> ${h(p.what_would_make_me_say_yes)}</p>`));
+    else if (o.coach_pre || s.status["panel:" + id]) parts.push(pending(id, "", "panel:" + id, s));
+  }
+
+  // Judge
+  if (o.judge) {
+    const j = o.judge;
+    parts.push(msg("judge", who("judge", "pre-meeting brief", `<span class="pill verdict-${h(j.verdict)}">${h(String(j.verdict).replace("_", " "))}</span>`) +
+      `<p style="font-size:16px"><strong>${h(j.headline)}</strong></p>` + (j.decision ? `<p><strong>Decision:</strong> ${h(j.decision)}</p>` : "") +
+      `<h4>Must fix before sending</h4>` + ((j.must_fix_before_sending || []).length ? `<ol>${j.must_fix_before_sending.map(x => `<li>${h(x)}</li>`).join("")}</ol>` : `<p class="muted">Nothing blocking.</p>`) +
+      `<h4>Questions you will be asked</h4>` + (j.likely_questions || []).map(q => `<div class="lq"><div class="ask">“${h(q.question)}”</div><div class="small muted">${h(q.asked_by)} · ${h(q.why_they_ask)}</div><div class="say"><strong>Say:</strong> ${h(q.suggested_answer)}</div></div>`).join("") +
+      ((j.blind_spots || []).length ? `<h4>Blind spots</h4>` + list(j.blind_spots, x => `<li>${h(x)}</li>`) : "") +
+      ((j.dissent || []).length ? `<details><summary>Where the panel disagrees</summary>${j.dissent.map(d => `<p><strong>${h(d.topic)}</strong></p>${list(d.positions, x => `<li>${h(x)}</li>`)}<p class="small"><span class="muted">Root cause:</span> ${h(d.root_cause)}</p>`).join("")}</details>` : "") +
+      `<details><summary>Consensus and next steps</summary>${list(j.consensus, x => `<li>${h(x)}</li>`)}<h4>Next steps</h4>${list(j.next_steps, x => `<li>${h(x)}</li>`)}</details>` +
+      `<div class="actions"><button class="btn" data-debrief="1">${s.debrief ? "Edit debrief" : "Record what was actually asked"}</button><button class="btn" data-retry="judge">Re-run Judge</button></div>`, "judge"));
+  } else if (s.status.judge || (o.coach_pre && !running && s.phase !== "new")) parts.push(pending("judge", "pre-meeting brief", "judge", s));
+
+  // Coach post
+  if (o.coach_post) {
+    const c = o.coach_post;
+    parts.push(msg("coach", who("coach", "recommended storyline") + `<p><strong>In one sentence:</strong> ${h(c.one_line_restatement)}</p><h4>Open with</h4><ul><li><strong>Situation.</strong> ${h(c.opening_scqa.situation)}</li><li><strong>Complication.</strong> ${h(c.opening_scqa.complication)}</li><li><strong>Question.</strong> ${h(c.opening_scqa.question)}</li><li><strong>Answer.</strong> ${h(c.opening_scqa.answer)}</li></ul>` +
+      `<h4>Storyline</h4><ol>${(c.recommended_storyline || []).map(x => `<li><strong>${h(x.title)}</strong><br>${h(x.key_message)}<br><span class="small muted">${h(x.why_here)}</span></li>`).join("")}</ol>` +
+      `<details><summary>Changes from your version and the so-what ladder</summary>${list(c.changes_from_original, x => `<li>${h(x)}</li>`)}<h4>So-what ladder</h4><ol>${(c.so_what_ladder || []).map(x => `<li>${h(x)}</li>`).join("")}</ol></details>`));
+  } else if (s.status.coach_post) parts.push(pending("coach", "recommended storyline", "coach_post", s));
+
+  // Debrief
+  if (s.debrief) {
+    const d = s.debrief; const qs = o.judge ? o.judge.likely_questions : [];
+    parts.push(`<div class="msg user"><div class="bubble"><div class="who"><span class="name">Debrief</span><span class="sub">${h(d.recordedAt.slice(0, 10))} · ${h(d.outcome)}</span></div>` +
+      list(qs, (q, i) => `<li>${d.asked.includes(i) ? "✓" : "—"} ${h(q.question)}</li>`) + (d.unpredicted.length ? `<h4>Not predicted</h4>${list(d.unpredicted, x => `<li>${h(x)}</li>`)}` : "") + (d.notes ? `<p class="small">${h(d.notes)}</p>` : "") + `</div><div class="avatar">YOU</div></div>`);
+  }
+
+  // Follow-ups
+  for (const f of s.followups || []) {
+    parts.push(`<div class="msg user"><div class="bubble"><div class="who"><span class="name">You</span><span class="sub">to ${h(roleName(f.role))}</span></div><p>${h(f.q)}</p></div><div class="avatar">YOU</div></div>`);
+    parts.push(msg(f.role, who(f.role) + (f.pending ? `<p data-live-followup>${h(f.a) || "…"}</p>` : `<p>${h(f.a)}</p>`) + (f.error ? `<p class="err small">${h(f.error)}</p>` : "")));
+  }
+  if (running && !(s.followups || []).some(f => f.pending)) parts.push(`<div class="system">Running… each role is one call to Claude. <button class="btn" data-stop="1">Stop</button></div>`);
+  else if (s.phase === "partial" && !running) parts.push(`<div class="system">Some roles failed. Retry them above, or <button class="btn" data-resume="1">continue to the Judge</button> without them.</div>`);
+  inner.innerHTML = parts.join("");
+  const t = el("thread"); t.scrollTop = t.scrollHeight;
+}
+
+// composer
+let draft = LS.get("draft", { mode: "preread", material: "", worry: "", panel: null });
+let followTarget = "judge";
+function renderComposer() {
+  const c = el("composer");
+  if (!sample) { c.innerHTML = `<div class="warn">This page needs to run inside claude.ai to ask Claude. Open it from your artifacts list.</div>`; return; }
+  if (current && current.outputs.judge) {
+    const targets = ["judge", "coach", "advocate", "challenger", ...current.panelIds];
+    c.innerHTML = `<div class="chips">${targets.map(id => { const [, color] = look(id); return `<button class="chip role" data-target="${h(id)}" aria-pressed="${followTarget === id}"><span class="dot" style="background:${color}"></span>${h(roleName(id))}</button>`; }).join("")}</div>
+      <div class="row"><textarea class="followup grow" id="fq" placeholder="Ask ${h(roleName(followTarget))} a follow-up, e.g. “What if I change the baseline to a 3-year average?”" ${running ? "disabled" : ""}></textarea><button class="btn primary" id="fsend" ${running ? "disabled" : ""}>Ask</button></div>
+      <div class="row"><span class="hint">Enter sends · Shift+Enter for a new line</span><span class="grow"></span><button class="btn" id="revise">Re-run on a revised version</button></div>`;
+    return;
+  }
+  if (current) { c.innerHTML = `<div class="row"><span class="hint">${running ? "Running. You can start another rehearsal from the menu once this one finishes." : "This rehearsal is unfinished."}</span></div>`; return; }
+  const mode = DATA.modes[draft.mode];
+  const panel = draft.panel || mode.panel;
+  c.innerHTML = `<div class="chips">${DATA.modeOrder.map(m => `<button class="chip" data-mode="${m}" aria-pressed="${draft.mode === m}" title="${h(DATA.modes[m].description)}">${h(DATA.modes[m].title)}</button>`).join("")}</div>
+    <textarea id="material" placeholder="${h(mode.input_hint)}">${h(draft.material)}</textarea>
+    <div class="row"><input type="text" id="worry" class="grow" placeholder="What are you most worried about? (optional)" value="${h(draft.worry)}"><button class="btn primary" id="go">Rehearse</button></div>
+    <details><summary>Panel: ${panel.map(roleName).join(", ")}</summary><div class="chips" style="margin-top:8px">${PANEL_IDS.map(id => { const [, color] = look(id); return `<button class="chip role" data-panel="${id}" aria-pressed="${panel.includes(id)}"><span class="dot" style="background:${color}"></span>${h(roleName(id))}</button>`; }).join("")}</div><div class="hint" style="margin-top:6px">Coach, Advocate, Challenger and Judge always take part.</div></details>
+    <div class="hint">Keep it de-identified: structure, logic and assumptions. No customer data, real figures or verbatim internal documents.</div>`;
+}
+
+// ---------------------------------------------------------------- sheets (profile, settings, debrief)
+function openSheet(html) { const s = el("sheet"); s.innerHTML = `<div class="card">${html}</div>`; s.hidden = false; }
+function closeSheet() { el("sheet").hidden = true; el("sheet").innerHTML = ""; }
+function openProfile() {
+  openSheet(`<h3>Workplace profile</h3><p class="small muted">Every role reads this before your material. Keep it de-identified: roles and patterns, not names or figures.</p>
+    <div class="field"><label for="pw">Profile</label><textarea id="pw">${h(profile.workplace)}</textarea></div>
+    <div class="field"><label for="pd">Debrief log (appended automatically after each debrief; edit freely)</label><textarea id="pd" style="min-height:20vh">${h(profile.debriefLog)}</textarea></div>
+    <div class="actions"><button class="btn primary" id="psave">Save</button><button class="btn" id="preset">Reset to defaults</button><button class="btn" id="pclose">Cancel</button></div>`);
+  el("psave").onclick = async () => { profile.workplace = el("pw").value; profile.debriefLog = el("pd").value; await saveProfile(); closeSheet(); };
+  el("preset").onclick = () => { el("pw").value = DATA.profileDefault; el("pd").value = DATA.debriefLogDefault; };
+  el("pclose").onclick = closeSheet;
+}
+function openSettings() {
+  openSheet(`<h3>Settings</h3>
+    <div class="field"><label for="lang">Output language</label><select id="lang">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}" ${settings.language === k ? "selected" : ""}>${v}</option>`).join("")}</select><span class="hint">Meetings are in English, so the brief is most useful in English.</span></div>
+    <div class="field"><label for="depth">Panel depth</label><select id="depth"><option value="standard" ${settings.depth === "standard" ? "selected" : ""}>Standard (faster; Judge and Coach always use the deepest model)</option><option value="deep" ${settings.depth === "deep" ? "selected" : ""}>Deep (every role on the most capable model; slower)</option></select></div>
+    <p class="small muted">Storage: ${db && uid ? "your private store on this artifact" : "this browser only (sign in to claude.ai to keep rehearsals across devices)"}.</p>
+    <div class="actions"><button class="btn primary" id="ssave">Save</button><button class="btn" id="sclose">Cancel</button></div>`);
+  el("ssave").onclick = async () => { settings.language = el("lang").value; settings.depth = el("depth").value; await saveProfile(); closeSheet(); };
+  el("sclose").onclick = closeSheet;
+}
+function openDebrief() {
+  const s = current; const qs = s.outputs.judge.likely_questions || []; const d = s.debrief || { asked: [], unpredicted: [], outcome: "", notes: "" };
+  openSheet(`<h3>Debrief: what actually happened</h3><p class="small muted">Tick the questions that were really asked. Add the ones the panel missed. This feeds every future rehearsal.</p>
+    <div>${qs.map((q, i) => `<label class="debrief-item"><input type="checkbox" data-q="${i}" ${d.asked.includes(i) ? "checked" : ""}><span>${h(q.question)} <span class="small muted">(${h(q.asked_by)})</span></span></label>`).join("")}</div>
+    <div class="field"><label for="dun">Asked but not predicted (one per line, say who asked)</label><textarea id="dun" style="min-height:90px">${h(d.unpredicted.join("\n"))}</textarea></div>
+    <div class="field"><label for="dout">Outcome in the room</label><input type="text" id="dout" value="${h(d.outcome)}" placeholder="approved / sent back / deferred, and why"></div>
+    <div class="field"><label for="dnotes">Anything worth remembering</label><textarea id="dnotes" style="min-height:70px">${h(d.notes)}</textarea></div>
+    <div class="actions"><button class="btn primary" id="dsave">Save debrief</button><button class="btn" id="dclose">Cancel</button></div>`);
+  el("dsave").onclick = async () => {
+    const asked = [...document.querySelectorAll("[data-q]")].filter(x => x.checked).map(x => Number(x.dataset.q));
+    const nd = { recordedAt: new Date().toISOString(), asked, unpredicted: el("dun").value.split("\n").map(x => x.trim()).filter(Boolean), outcome: el("dout").value.trim(), notes: el("dnotes").value.trim() };
+    const entry = debriefEntry(s, nd);
+    if (s.debrief && s.debrief.logEntry) profile.debriefLog = profile.debriefLog.replace(s.debrief.logEntry, entry); else profile.debriefLog = (profile.debriefLog || "").replace(/\s*$/, "") + "\n\n" + entry;
+    nd.logEntry = entry; s.debrief = nd;
+    await saveProfile(); await saveSession(s); closeSheet(); render();
+  };
+  el("dclose").onclick = closeSheet;
+}
+
+// ---------------------------------------------------------------- brief export
+function briefMarkdown(s) {
+  const j = s.outputs.judge; const L = [`# ${DATA.modes[s.mode].title}: ${sessionTitle(s)}`, `**Verdict: ${j.verdict.replace("_", " ").toUpperCase()}.** ${j.headline}`, ""];
+  if (j.decision) L.push(`**Decision:** ${j.decision}`, "");
+  L.push("## Must fix before sending", ...j.must_fix_before_sending.map((x, i) => `${i + 1}. ${x}`), "", "## Questions you will be asked");
+  for (const q of j.likely_questions) L.push(`- **${q.question}** (${q.asked_by})`, `  - Say: ${q.suggested_answer}`);
+  if (j.blind_spots.length) L.push("", "## Blind spots", ...j.blind_spots.map(x => `- ${x}`));
+  if (s.outputs.coach_post) L.push("", "## Recommended storyline", ...s.outputs.coach_post.recommended_storyline.map((x, i) => `${i + 1}. **${x.title}** ${x.key_message}`));
+  return L.join("\n");
+}
+
+// ---------------------------------------------------------------- events
+function newSession() {
+  if (running) return;
+  current = null; render();
+}
+async function startRun() {
+  const material = el("material").value.trim(); if (!material) { el("material").focus(); return; }
+  const mode = DATA.modes[draft.mode]; const panelIds = (draft.panel || mode.panel).slice();
+  const now = new Date(); const id = now.toISOString().replace(/[-:T]/g, "").slice(0, 14) + "-" + draft.mode;
+  current = { kind: "session", id, createdAt: now.toISOString(), mode: draft.mode, material, worry: el("worry").value.trim(), panelIds, language: settings.language, phase: "running",
+    outputs: { coach_pre: null, advocate: null, challenger: null, judge: null, coach_post: null, panel: {} }, status: {}, errors: {}, followups: [], debrief: null };
+  draft = { ...draft, material: "", worry: "" }; LS.set("draft", draft);
+  await saveSession(current); render();
+  await runPipeline(current);
+}
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.id === "newBtn") { newSession(); el("app").classList.remove("rail-open"); }
+  else if (t.id === "profileBtn") openProfile();
+  else if (t.id === "settingsBtn") openSettings();
+  else if (t.id === "railOpen") el("app").classList.add("rail-open");
+  else if (t.id === "railClose") el("app").classList.remove("rail-open");
+  else if (t.dataset.open) { if (running) return; current = sessions.find(s => s.id === t.dataset.open) || null; if (current && !current.status) current.status = {}; el("app").classList.remove("rail-open"); render(); if (current && current.phase === "running") { current.phase = "partial"; await saveSession(current); render(); } }
+  else if (t.dataset.mode) { draft.mode = t.dataset.mode; draft.panel = null; draft.material = el("material").value; draft.worry = el("worry").value; LS.set("draft", draft); renderComposer(); }
+  else if (t.dataset.panel) { const p = (draft.panel || DATA.modes[draft.mode].panel).slice(); const i = p.indexOf(t.dataset.panel); if (i >= 0) { if (p.length > 1) p.splice(i, 1); } else p.push(t.dataset.panel); draft.panel = p; draft.material = el("material").value; draft.worry = el("worry").value; LS.set("draft", draft); renderComposer(); const d = el("composer").querySelector("details"); if (d) d.open = true; }
+  else if (t.id === "go") startRun();
+  else if (t.dataset.retry) retryRole(t.dataset.retry);
+  else if (t.dataset.resume) runPipeline(current, "judge");
+  else if (t.dataset.stop) { if (abortCtl) abortCtl.abort(); }
+  else if (t.dataset.target) { followTarget = t.dataset.target; renderComposer(); el("fq").focus(); }
+  else if (t.id === "fsend") { const q = el("fq").value.trim(); if (q) { el("fq").value = ""; followUp(followTarget, q); } }
+  else if (t.id === "revise") { if (running) return; draft = { ...draft, mode: current.mode, material: current.material, worry: current.worry, panel: current.panelIds.slice() }; LS.set("draft", draft); current = null; render(); el("material").focus(); }
+  else if (t.dataset.debrief) openDebrief();
+  else if (t.id === "copyBtn") {
+    const md = briefMarkdown(current);
+    try { await navigator.clipboard.writeText(md); t.textContent = "Copied"; setTimeout(() => t.textContent = "Copy brief", 1500); }
+    catch { openSheet(`<h3>Brief as Markdown</h3><textarea readonly style="min-height:50vh">${h(md)}</textarea><div class="actions"><button class="btn" id="mclose">Close</button></div>`); el("mclose").onclick = closeSheet; }
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.target.id === "fq" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el("fsend").click(); }
+});
+document.addEventListener("input", (e) => { if (e.target.id === "material" || e.target.id === "worry") { draft.material = el("material").value; draft.worry = el("worry").value; LS.set("draft", draft); } });
+el("sheet").addEventListener("click", (e) => { if (e.target === el("sheet")) closeSheet(); });
+
+// ---------------------------------------------------------------- boot
+render();
+(async () => {
+  const use = (n) => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
+  const [sm, d, u] = await Promise.all([use("sample"), use("db"), use("user")]);
+  sample = sm; db = d;
+  try { uid = u ? await u.id() : null; } catch { uid = null; }
+  await loadAll();
+  render();
+})();
+})();
+</script>
