@@ -192,10 +192,24 @@ Three months of this makes the panel sharper than any generic prompt.
 
 ## 8. Interface plan
 
-**v1 (this build).** Python CLI. Output is a self-contained HTML report opened in
-the browser. The HTML gives most of the reading experience (cards, collapsible
-sections, Judge brief up front). Purpose: test role quality against real,
-de-identified cases and iterate on prompts.
+**v1 (this build), two runtimes over one pipeline.**
+
+*Claude Code skill (`/rehearse`), the primary path.* The user opens a Claude
+Code session on the repository and types `/rehearse <mode>`. Claude is the
+orchestrator, not a role: the package writes one prompt file per role
+(`rehearse stage init` / `stage next`), Claude runs each prompt in its own
+subagent so roles stay independent, the package validates each JSON output
+against the role's schema, advances the stage, and renders the report. No API
+key, nothing to install, billed to the user's Claude subscription. The
+conversation is the frontend: follow-up questions to one role, re-runs on a
+revised deck, and the debrief all happen in chat.
+
+*Python CLI (`rehearse run`), the direct path.* Same pipeline calling the
+Claude API with the user's own key, roles in parallel via `asyncio`. For
+running outside Claude Code, or for scripted evaluation of prompt changes.
+
+Both produce the same `session.json` and the same HTML report. Role files,
+modes and the profile are shared, so editing a persona improves both.
 
 **v2.** Local web app (FastAPI + plain HTML/JS or Streamlit). Adds: follow-up
 question to a single role, v1 vs v2 comparison of a revised input, interactive
@@ -235,8 +249,9 @@ profile/
   workplace.md              user-maintained context (template provided)
   debrief_log.md            appended by `rehearse debrief`
 rehearsal/                  the package
-  cli.py  config.py  engine.py  llm.py  schemas.py  report.py  debrief.py
+  cli.py  config.py  engine.py  staging.py  llm.py  schemas.py  report.py  debrief.py
   templates/report.html.j2
+.claude/skills/rehearse/    the /rehearse skill (Claude Code orchestrates the staged runner)
 examples/                   de-identified sample inputs
 sessions/                   run outputs (git-ignored)
 tests/

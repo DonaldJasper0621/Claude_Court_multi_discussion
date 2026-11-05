@@ -141,7 +141,92 @@ def _dump(model: BaseModel | None) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Engine
+# Prompt assembly (shared by the async engine and the staged runner)
+# --------------------------------------------------------------------------- #
+
+
+class Prompts:
+    """Builds (system_blocks, user_text) for every role call in a run."""
+
+    def __init__(self, cfg: Config, mode: Mode, input_text: str, worry: str | None) -> None:
+        self.cfg = cfg
+        self.mode = mode
+        self.profile_block = _profile_block(cfg)
+        self.material = _material_block(mode, input_text, worry)
+
+    def _sys(self, role: Role, *, panel: bool) -> list[dict[str, Any]]:
+        return _system_blocks(self.cfg, role, self.profile_block, panel=panel)
+
+    def shared_user(self, structure: StructureAnalysis | None) -> str:
+        return self.material + "\n" + _structure_block(structure)
+
+    def coach_pre(self) -> tuple[list[dict[str, Any]], str]:
+        role = self.cfg.mechanism("coach")
+        user = (
+            self.material
+            + "\n# Task\nThis is the PRE-PASS. Produce the structure analysis described in your role. "
+            "Do not evaluate the recommendation; map the argument."
+        )
+        return self._sys(role, panel=False), user
+
+    def advocate(self, structure: StructureAnalysis | None) -> tuple[list[dict[str, Any]], str]:
+        role = self.cfg.mechanism("advocate")
+        return self._sys(role, panel=False), self.shared_user(structure) + "\n# Task\nBuild the strongest honest case for this material."
+
+    def challenger(self, structure: StructureAnalysis | None) -> tuple[list[dict[str, Any]], str]:
+        role = self.cfg.mechanism("challenger")
+        return self._sys(role, panel=False), self.shared_user(structure) + "\n# Task\nFind the holes, ranked by damage if raised live."
+
+    def panelist(self, role: Role, structure: StructureAnalysis | None) -> tuple[list[dict[str, Any]], str]:
+        return self._sys(role, panel=True), self.shared_user(structure) + f"\n# Task\nRespond as {role.name}, following the output schema."
+
+    def judge(self, session: Session, panel_roles: list[Role]) -> tuple[list[dict[str, Any]], str]:
+        role = self.cfg.mechanism("judge")
+        parts = [self.shared_user(session.structure), f"# Judge focus for this mode\n{self.mode.judge_focus}\n"]
+        parts.append("# Advocate\n" + _dump(session.advocate))
+        parts.append("# Challenger\n" + _dump(session.challenger))
+        parts.append("# Panel (independent responses)")
+        by_id = {r.role_id: r for r in session.panel}
+        for pr in panel_roles:
+            result = by_id.get(pr.id)
+            parts.append(f"## {pr.name} (`{pr.id}`)\n" + _dump(result.output if result else None))
+        if session.errors:
+            parts.append("# Roles that failed to respond\n" + "\n".join(f"- {k}: {v}" for k, v in session.errors.items()))
+        parts.append("# Task\nProduce the pre-meeting brief described in your role, following the output schema.")
+        return self._sys(role, panel=False), "\n\n".join(parts)
+
+    def coach_post(self, session: Session) -> tuple[list[dict[str, Any]], str]:
+        role = self.cfg.mechanism("coach")
+        user = (
+            self.shared_user(session.structure)
+            + "\n# Judge's brief\n"
+            + _dump(session.judge)
+            + "\n\n# Task\nThis is the POST-PASS. Propose the restructured storyline described in your role, "
+            "addressing the Judge's must-fix items where structure can address them."
+        )
+        return self._sys(role, panel=False), user
+
+
+def new_session(cfg: Config, mode: Mode, input_text: str, worry: str | None, panel_ids: list[str] | None, *, mock: bool = False) -> tuple[Session, list[Role]]:
+    panel_ids = list(panel_ids) if panel_ids else list(mode.panel)
+    panel_roles = [cfg.panelist(rid) for rid in panel_ids]
+    now = datetime.now()
+    session = Session(
+        id=f"{now:%Y%m%d-%H%M%S}-{mode.id}",
+        created_at=now.isoformat(timespec="seconds"),
+        mode=mode.id,
+        mode_title=mode.title,
+        input_text=input_text,
+        worry=worry,
+        panel_ids=panel_ids,
+        mock=mock,
+        output_language=cfg.output_language,
+    )
+    return session, panel_roles
+
+
+# --------------------------------------------------------------------------- #
+# Engine (async, calls the model directly)
 # --------------------------------------------------------------------------- #
 
 
@@ -152,8 +237,6 @@ class Engine:
         self.progress = progress or (lambda _msg: None)
         self.mock = mock
         self._sem = asyncio.Semaphore(cfg.max_concurrency)
-
-    # ----- public --------------------------------------------------------- #
 
     async def run(
         self,
@@ -166,138 +249,41 @@ class Engine:
         mode = self.cfg.modes.get(mode_id)
         if mode is None:
             raise ValueError(f"Unknown mode '{mode_id}'. Available: {', '.join(self.cfg.modes)}")
-        panel_ids = list(panel_ids) if panel_ids else list(mode.panel)
-        panel_roles = [self.cfg.panelist(rid) for rid in panel_ids]
-
-        now = datetime.now()
-        session = Session(
-            id=f"{now:%Y%m%d-%H%M%S}-{mode.id}",
-            created_at=now.isoformat(timespec="seconds"),
-            mode=mode.id,
-            mode_title=mode.title,
-            input_text=input_text,
-            worry=worry,
-            panel_ids=panel_ids,
-            mock=self.mock,
-            output_language=self.cfg.output_language,
-        )
-        profile_block = _profile_block(self.cfg)
-        material = _material_block(mode, input_text, worry)
+        session, panel_roles = new_session(self.cfg, mode, input_text, worry, panel_ids, mock=self.mock)
+        prompts = Prompts(self.cfg, mode, input_text, worry)
+        coach = self.cfg.mechanism("coach")
 
         # 1. Coach pre-pass
         self.progress("Coach: structure analysis")
-        coach = self.cfg.mechanism("coach")
-        session.structure = await self._call(
-            session,
-            coach,
-            StructureAnalysis,
-            system=_system_blocks(self.cfg, coach, profile_block, panel=False),
-            user=material
-            + "\n# Task\nThis is the PRE-PASS. Produce the structure analysis described in your role. "
-            "Do not evaluate the recommendation; map the argument.",
-            kind="coach",
-        )
-        structure_block = _structure_block(session.structure)
-        shared_user = material + "\n" + structure_block
+        sys_, user = prompts.coach_pre()
+        session.structure = await self._call(session, coach, StructureAnalysis, system=sys_, user=user, kind="coach")
 
         # 2. Advocate, Challenger, panel in parallel
         self.progress(f"Panel: advocate, challenger and {len(panel_roles)} panelists in parallel")
-        advocate = self.cfg.mechanism("advocate")
-        challenger = self.cfg.mechanism("challenger")
-        tasks: list[asyncio.Task[Any]] = [
-            asyncio.create_task(
-                self._call(
-                    session,
-                    advocate,
-                    AdvocateOutput,
-                    system=_system_blocks(self.cfg, advocate, profile_block, panel=False),
-                    user=shared_user + "\n# Task\nBuild the strongest honest case for this material.",
-                    kind="panel",
-                )
-            ),
-            asyncio.create_task(
-                self._call(
-                    session,
-                    challenger,
-                    ChallengerOutput,
-                    system=_system_blocks(self.cfg, challenger, profile_block, panel=False),
-                    user=shared_user + "\n# Task\nFind the holes, ranked by damage if raised live.",
-                    kind="panel",
-                )
-            ),
-        ]
+        tasks: list[asyncio.Task[Any]] = []
+        sys_, user = prompts.advocate(session.structure)
+        tasks.append(asyncio.create_task(self._call(session, self.cfg.mechanism("advocate"), AdvocateOutput, system=sys_, user=user, kind="panel")))
+        sys_, user = prompts.challenger(session.structure)
+        tasks.append(asyncio.create_task(self._call(session, self.cfg.mechanism("challenger"), ChallengerOutput, system=sys_, user=user, kind="panel")))
         for role in panel_roles:
-            tasks.append(
-                asyncio.create_task(
-                    self._call(
-                        session,
-                        role,
-                        PanelistOutput,
-                        system=_system_blocks(self.cfg, role, profile_block, panel=True),
-                        user=shared_user + f"\n# Task\nRespond as {role.name}, following the output schema.",
-                        kind="panel",
-                    )
-                )
-            )
+            sys_, user = prompts.panelist(role, session.structure)
+            tasks.append(asyncio.create_task(self._call(session, role, PanelistOutput, system=sys_, user=user, kind="panel")))
         results = await asyncio.gather(*tasks)
         session.advocate = results[0]
         session.challenger = results[1]
         for role, output in zip(panel_roles, results[2:]):
-            session.panel.append(
-                PanelistResult(
-                    role_id=role.id,
-                    role_name=role.name,
-                    output=output,
-                    error=session.errors.get(role.id),
-                )
-            )
+            session.panel.append(PanelistResult(role_id=role.id, role_name=role.name, output=output, error=session.errors.get(role.id)))
 
         # 3. Judge
         self.progress("Judge: synthesizing the brief")
-        judge = self.cfg.mechanism("judge")
-        session.judge = await self._call(
-            session,
-            judge,
-            JudgeBrief,
-            system=_system_blocks(self.cfg, judge, profile_block, panel=False),
-            user=self._judge_user(mode, shared_user, session, panel_roles),
-            kind="judge",
-        )
+        sys_, user = prompts.judge(session, panel_roles)
+        session.judge = await self._call(session, self.cfg.mechanism("judge"), JudgeBrief, system=sys_, user=user, kind="judge")
 
         # 4. Coach post-pass
         self.progress("Coach: recommended storyline")
-        session.storyline = await self._call(
-            session,
-            coach,
-            Storyline,
-            system=_system_blocks(self.cfg, coach, profile_block, panel=False),
-            user=(
-                material
-                + "\n"
-                + structure_block
-                + "\n# Judge's brief\n"
-                + _dump(session.judge)
-                + "\n\n# Task\nThis is the POST-PASS. Propose the restructured storyline described in your role, "
-                "addressing the Judge's must-fix items where structure can address them."
-            ),
-            kind="coach",
-            role_key="coach_post",
-        )
+        sys_, user = prompts.coach_post(session)
+        session.storyline = await self._call(session, coach, Storyline, system=sys_, user=user, kind="coach", role_key="coach_post")
         return session
-
-    # ----- internals ------------------------------------------------------ #
-
-    def _judge_user(self, mode: Mode, shared_user: str, session: Session, panel_roles: list[Role]) -> str:
-        parts = [shared_user, f"# Judge focus for this mode\n{mode.judge_focus}\n"]
-        parts.append("# Advocate\n" + _dump(session.advocate))
-        parts.append("# Challenger\n" + _dump(session.challenger))
-        parts.append("# Panel (independent responses)")
-        for role, result in zip(panel_roles, session.panel):
-            parts.append(f"## {role.name} (`{role.id}`)\n" + _dump(result.output))
-        if session.errors:
-            parts.append("# Roles that failed to respond\n" + "\n".join(f"- {k}: {v}" for k, v in session.errors.items()))
-        parts.append("# Task\nProduce the pre-meeting brief described in your role, following the output schema.")
-        return "\n\n".join(parts)
 
     async def _call(
         self,
@@ -317,12 +303,7 @@ class Engine:
         async with self._sem:
             try:
                 output, usage = await self.llm.complete(
-                    system=system,
-                    user=user,
-                    schema=schema,
-                    model=model,
-                    effort=effort,
-                    max_tokens=self.cfg.max_tokens,
+                    system=system, user=user, schema=schema, model=model, effort=effort, max_tokens=self.cfg.max_tokens,
                 )
                 error = None
             except LLMError as e:

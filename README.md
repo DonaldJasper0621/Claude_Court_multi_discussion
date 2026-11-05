@@ -8,7 +8,34 @@ you will be asked, and how to answer.
 
 Design rationale, role architecture and the v2 plan are in [DESIGN.md](DESIGN.md).
 
-## Install
+## The easy way: run it inside Claude Code
+
+Nothing to install, no API key. Open a Claude Code session on this repository
+(web, desktop or cloud), paste your deck outline or memo, and type:
+
+```
+/rehearse preread
+```
+
+Claude orchestrates the run: it writes one prompt file per role, plays each
+role in its own subagent so they stay independent, validates every output,
+and sends you the HTML report plus a two-minute summary in chat. Add a worry
+and a mode if you like:
+
+```
+/rehearse preread -w "Finance will question the sizing baseline"
+/rehearse framing
+/rehearse decide --add strategy_partner
+/rehearse debrief          # after the real meeting
+```
+
+The skill is in `.claude/skills/rehearse/SKILL.md`. It uses your Claude
+subscription; the Python engine below is only needed if you want to run it
+outside Claude Code with your own API key.
+
+## The direct way: Python CLI with an API key
+
+### Install
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -50,6 +77,17 @@ rehearse profile                    # path of the workplace profile to edit
 
 `-p/--panel` replaces the mode's default panel. `-a/--add` adds to it.
 `--language zh-TW` switches the output language for one run.
+
+### Staged mode (what the Claude Code skill uses)
+
+```bash
+rehearse stage init -m preread -i deck.md      # writes stages/coach_pre/*.prompt.md
+# ... something answers each prompt by writing the matching *.output.json ...
+rehearse stage next <session dir>              # validates, writes the next stage, or renders
+rehearse debrief <session> --from answers.json # non-interactive debrief
+```
+
+Any orchestrator that can read a prompt file and write JSON can drive it.
 
 ## What makes it yours
 

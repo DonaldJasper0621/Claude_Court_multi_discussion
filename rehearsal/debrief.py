@@ -45,6 +45,39 @@ def run_debrief(session: Session, ask: Ask = input, say: Callable[[str], None] =
     )
 
 
+def debrief_from_file(session: Session, path: Path) -> Debrief:
+    """Non-interactive debrief from a JSON file:
+
+    {"outcome_in_room": "...", "asked": [0, 2], "unpredicted": ["..."], "notes": "..."}
+
+    `asked` lists zero-based indices into the Judge's likely_questions.
+    """
+    import json
+
+    if session.judge is None:
+        raise ValueError("This session has no Judge brief to debrief against.")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    questions = session.judge.likely_questions
+    asked_raw = data.get("asked", [])
+    if not isinstance(asked_raw, list):
+        raise ValueError("'asked' must be a list of indices")
+    asked: set[int] = set()
+    for i in asked_raw:
+        if not isinstance(i, int) or not 0 <= i < len(questions):
+            raise ValueError(f"'asked' index {i!r} is out of range 0..{len(questions) - 1}")
+        asked.add(i)
+    return Debrief(
+        recorded_at=datetime.now().isoformat(timespec="minutes"),
+        outcome_in_room=str(data.get("outcome_in_room", "")).strip(),
+        predicted=[
+            DebriefAnswer(question=q.question, predicted_for=q.asked_by, asked=(i in asked))
+            for i, q in enumerate(questions)
+        ],
+        unpredicted=[str(x) for x in data.get("unpredicted", [])],
+        notes=str(data.get("notes", "")).strip(),
+    )
+
+
 def format_log_entry(session: Session, debrief: Debrief) -> str:
     asked = [a for a in debrief.predicted if a.asked]
     missed = [a for a in debrief.predicted if not a.asked]

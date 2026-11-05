@@ -10,10 +10,11 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, ConfigError, load_config
-from .debrief import append_to_log, format_log_entry, hit_rate, run_debrief
+from .debrief import append_to_log, debrief_from_file, format_log_entry, hit_rate, run_debrief
 from .engine import Engine, load_session, save_session
 from .llm import AnthropicLLM, MockLLM
 from .report import write_report
+from .staging import advance, init_session
 
 CONFIDENTIALITY_NOTE = (
     "Reminder: input should be de-identified structure, logic and assumptions. "
@@ -43,19 +44,14 @@ def _read_input(spec: str) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
+def _resolve_run_args(cfg: Config, args: argparse.Namespace) -> tuple[str, list[str] | None]:
+    """Shared by `run` and `stage init`. Raises ValueError with a user message."""
     mode = cfg.modes.get(args.mode)
     if mode is None:
-        _err(f"unknown mode '{args.mode}'. Available: {', '.join(cfg.modes)}")
-        return 2
-    try:
-        input_text = _read_input(args.input)
-    except FileNotFoundError as e:
-        _err(str(e))
-        return 2
+        raise ValueError(f"unknown mode '{args.mode}'. Available: {', '.join(cfg.modes)}")
+    input_text = _read_input(args.input)
     if not input_text.strip():
-        _err("input is empty")
-        return 2
+        raise ValueError("input is empty")
 
     panel_ids: list[str] | None = None
     if args.panel:
@@ -69,11 +65,19 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
         for rid in panel_ids or []:
             cfg.panelist(rid)
     except ConfigError as e:
+        raise ValueError(str(e)) from e
+
+    if getattr(args, "language", None):
+        cfg.output_language = args.language
+    return input_text, panel_ids
+
+
+def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
+    try:
+        input_text, panel_ids = _resolve_run_args(cfg, args)
+    except (ValueError, FileNotFoundError) as e:
         _err(str(e))
         return 2
-
-    if args.language:
-        cfg.output_language = args.language
 
     _progress(CONFIDENTIALITY_NOTE)
     if args.mock:
@@ -133,10 +137,16 @@ def cmd_debrief(cfg: Config, args: argparse.Namespace) -> int:
             return 2
     session = load_session(path)
     try:
-        debrief = run_debrief(session)
+        if args.from_file:
+            debrief = debrief_from_file(session, Path(args.from_file))
+        else:
+            debrief = run_debrief(session)
     except (EOFError, KeyboardInterrupt):
         print("\naborted", file=sys.stderr)
         return 130
+    except (ValueError, FileNotFoundError) as e:
+        _err(str(e))
+        return 2
     session.debrief = debrief
     session_dir = path if path.is_dir() else path.parent
     save_session(session, session_dir.parent)
@@ -169,6 +179,40 @@ def cmd_profile(cfg: Config, _args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_stage_init(cfg: Config, args: argparse.Namespace) -> int:
+    try:
+        input_text, panel_ids = _resolve_run_args(cfg, args)
+    except (ValueError, FileNotFoundError) as e:
+        _err(str(e))
+        return 2
+    session_dir = init_session(cfg, mode_id=args.mode, input_text=input_text, worry=args.worry, panel_ids=panel_ids)
+    print(advance(cfg, session_dir).format())
+    return 0
+
+
+def cmd_stage_next(cfg: Config, args: argparse.Namespace) -> int:
+    path = Path(args.session)
+    if not path.exists():
+        candidate = cfg.sessions_dir / args.session
+        if not candidate.exists():
+            _err(f"session not found: {args.session}")
+            return 2
+        path = candidate
+    skip = [s.strip() for s in (args.skip or "").split(",") if s.strip()]
+    report = advance(cfg, path, skip=skip)
+    print(report.format())
+    return 0
+
+
+def _add_run_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("-m", "--mode", required=True, help="framing | method | preread | stakeholder | decide")
+    p.add_argument("-i", "--input", required=True, help="Path to a Markdown/text file, or - for stdin.")
+    p.add_argument("-w", "--worry", help="What you are most worried about, in a sentence.")
+    p.add_argument("-p", "--panel", help="Comma-separated panel role ids; replaces the mode default.")
+    p.add_argument("-a", "--add", help="Comma-separated panel role ids to add to the default.")
+    p.add_argument("--language", help="Override output language (e.g. en, zh-TW).")
+
+
 # --------------------------------------------------------------------------- #
 # Parser
 # --------------------------------------------------------------------------- #
@@ -183,16 +227,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--root", type=Path, help="Project root containing config.yaml (default: search upward from cwd).")
     sub = p.add_subparsers(dest="command", required=True)
 
-    r = sub.add_parser("run", help="Run a rehearsal on a piece of material.")
-    r.add_argument("-m", "--mode", required=True, help="framing | method | preread | stakeholder | decide")
-    r.add_argument("-i", "--input", required=True, help="Path to a Markdown/text file, or - for stdin.")
-    r.add_argument("-w", "--worry", help="What you are most worried about, in a sentence.")
-    r.add_argument("-p", "--panel", help="Comma-separated panel role ids; replaces the mode default.")
-    r.add_argument("-a", "--add", help="Comma-separated panel role ids to add to the default.")
-    r.add_argument("--language", help="Override output language (e.g. en, zh-TW).")
+    r = sub.add_parser("run", help="Run a rehearsal by calling the model directly (needs credentials).")
+    _add_run_args(r)
     r.add_argument("--mock", action="store_true", help="Run without calling the model (pipeline check).")
     r.add_argument("--no-open", action="store_true", help="Do not open the report in a browser.")
     r.set_defaults(func=cmd_run)
+
+    st = sub.add_parser("stage", help="Staged run driven by an external orchestrator (e.g. Claude Code subagents).")
+    st_sub = st.add_subparsers(dest="stage_command", required=True)
+    si = st_sub.add_parser("init", help="Create a session and write the first stage's prompt files.")
+    _add_run_args(si)
+    si.set_defaults(func=cmd_stage_init)
+    sn = st_sub.add_parser("next", help="Ingest written outputs, write the next stage's prompts, or render when done.")
+    sn.add_argument("session", help="Session id or path.")
+    sn.add_argument("--skip", help="Comma-separated role keys to mark as failed and move past.")
+    sn.set_defaults(func=cmd_stage_next)
 
     sub.add_parser("modes", help="List modes and their default panels.").set_defaults(func=cmd_modes)
     sub.add_parser("roles", help="List available roles.").set_defaults(func=cmd_roles)
@@ -201,6 +250,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     d = sub.add_parser("debrief", help="Record what was actually asked in the real meeting.")
     d.add_argument("session", help="Session id or path (directory or session.json).")
+    d.add_argument("--from", dest="from_file", help="Non-interactive: JSON file with outcome_in_room, asked (indices), unpredicted, notes.")
     d.set_defaults(func=cmd_debrief)
     return p
 
