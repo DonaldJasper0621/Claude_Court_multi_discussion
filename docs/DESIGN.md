@@ -208,6 +208,17 @@ revised deck, and the debrief all happen in chat.
 Claude API with the user's own key, roles in parallel via `asyncio`. For
 running outside Claude Code, or for scripted evaluation of prompt changes.
 
+*In-project context (the reason the skill is the primary path).* `-c` lists
+files and directories the roles may open. In the Claude Code runtime the
+subagents read them with their own tools and cite file and line; in the API
+runtime the contents are inlined into the prompts. `review` mode exists for
+this: an analysis in progress, checked against the queries behind it.
+
+*Practice scenarios.* `/scenario` builds a case (brief, synthetic data with
+planted causes and traps, data dictionary, sealed base64 answer key). `grade`
+mode gives only the Judge the key and returns a `GradeReport`: cause by cause
+found or missed, red herrings taken, method gaps, what to practise next.
+
 Both produce the same `session.json` and the same HTML report. Role files,
 modes and the profile are shared, so editing a persona improves both.
 
@@ -238,27 +249,26 @@ The frontend is deliberately second. The asset is the role prompts.
 ## 10. Repository layout
 
 ```
-README.md                   the map: where everything lives, how to run it
+README.md                   the map: install, use in a project, where everything lives
 CLAUDE.md                   conventions for Claude Code sessions on this repo
 docs/DESIGN.md              this document
-config/config.yaml          models, effort, concurrency, output language (CLI)
-config/modes.yaml           the five modes
-roles/mechanism/            coach, advocate, challenger, judge
-roles/panel/                one file per panelist
-profile/workplace.md        default workplace context (the app keeps its own copy per account)
-profile/debrief_log.md      default debrief log
-rehearsal/                  the Python package
-  schemas.py  config.py  engine.py  staging.py  llm.py  report.py  debrief.py  cli.py
-  templates/report.html.j2
-app/template.html           web app source
-app/dist/index.html         built page, published as the claude.ai artifact
-scripts/build_app.py        bundles roles, modes, profile and schemas into app/dist/index.html
-.claude/skills/rehearse/    the /rehearse Claude Code skill
-examples/inputs/            de-identified sample inputs
-examples/outputs/           the report the sample produced
-sessions/                   CLI and skill run outputs (git-ignored)
+rehearsal/                  the package
+  assets/config.yaml        models, effort, paths (defaults)
+  assets/modes.yaml         framing, method, preread, stakeholder, decide, review, grade
+  assets/roles/             mechanism/ and panel/ personas
+  assets/profile/           default workplace profile and debrief log
+  assets/skills/            /rehearse and /scenario (copied into projects by `rehearse init`)
+  schemas.py config.py engine.py staging.py llm.py report.py debrief.py cli.py
+app/template.html           web app source; app/dist/index.html built and published
+scripts/build_app.py        bundles assets and schemas into the app
+playground/cobrand-delinquency/   practice case with its own .rehearsal/ and sealed key
 tests/
 ```
+
+A project that runs `rehearse init` gets `.rehearsal/` (config, modes, roles,
+profile, scenarios, git-ignored sessions) and `.claude/skills/`. Both are
+committed, so the tuned panel and any sealed practice keys travel with the
+project to every machine.
 
 ## 11. Open questions for v2
 

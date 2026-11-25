@@ -112,6 +112,32 @@
 {% endif %}
 {% endif %}
 
+{# ------------------------------------------------------------------ Grade #}
+{% if s.grade %}
+<h2>Grade against the answer key</h2>
+<div class="card">
+  <p class="headline"><strong>{{ s.grade.score_out_of_10 }} / 10.</strong> {{ s.grade.headline }}</p>
+  {% for c in s.grade.causes %}
+  <div class="lq" style="margin:8px 0">
+    <div><span class="sev sev-{{ 'low' if c.status == 'found' else ('medium' if c.status == 'partially_found' else 'high') }}">{{ c.status | replace("_", " ") }}</span> <strong>{{ c.planted_cause }}</strong></div>
+    {% if c.evidence_in_analysis %}<div class="small muted">Evidence: {{ c.evidence_in_analysis }}</div>{% endif %}
+    <div class="small">{{ c.note }}</div>
+  </div>
+  {% endfor %}
+</div>
+<div class="two">
+  <div class="card">
+    {% if s.grade.false_leads_taken %}<h3>False leads taken</h3><ul>{% for x in s.grade.false_leads_taken %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    <h3>Method gaps</h3><ul>{% for x in s.grade.method_gaps %}<li>{{ x }}</li>{% endfor %}</ul>
+  </div>
+  <div class="card">
+    <h3>Done well</h3><ul>{% for x in s.grade.what_was_done_well %}<li>{{ x }}</li>{% endfor %}</ul>
+    <h3 style="margin-top:14px">Practice next</h3><ul>{% for x in s.grade.what_to_practice_next %}<li>{{ x }}</li>{% endfor %}</ul>
+  </div>
+</div>
+<div class="card"><h3>Model answer</h3><p>{{ s.grade.model_answer_summary }}</p></div>
+{% endif %}
+
 {# ------------------------------------------------------------------ Coach storyline #}
 {% if s.storyline %}
 <h2>Coach: recommended storyline</h2>

@@ -1,12 +1,26 @@
-"""Load config/config.yaml, config/modes.yaml, role personas, and the workplace profile."""
+"""Load config.yaml, modes.yaml, role personas, and the workplace profile.
+
+Where the configuration comes from, in order:
+
+1. `REHEARSAL_ROOT` (a directory holding config.yaml), if set.
+2. The nearest `.rehearsal/` directory walking up from the current directory.
+   `rehearse init` creates one inside a project, with its own editable copy of
+   the defaults, so each project can tune roles and profile and commit them.
+3. The defaults bundled with the package (`rehearsal/assets/`). Read-only;
+   sessions then go to `<cwd>/.rehearsal/sessions`.
+"""
 
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+ASSETS = Path(__file__).resolve().parent / "assets"
+PROJECT_DIRNAME = ".rehearsal"
 
 
 class ConfigError(Exception):
@@ -31,11 +45,13 @@ class Mode:
     panel: list[str]
     emphasis: str
     judge_focus: str
+    judge_schema: str = "JudgeBrief"  # name of the schema the Judge answers with
 
 
 @dataclass
 class Config:
-    root: Path
+    base: Path       # directory holding config.yaml; relative paths resolve here
+    project: Path    # the project this run belongs to (sessions live under it)
     models: dict[str, str]
     effort: dict[str, str]
     max_tokens: int
@@ -46,11 +62,21 @@ class Config:
     roles: dict[str, Role] = field(default_factory=dict)
 
     # ----- resolved paths ------------------------------------------------- #
+    @property
+    def root(self) -> Path:  # kept for callers that predate `base`
+        return self.base
+
+    @property
+    def bundled(self) -> bool:
+        return _is_under(self.base, ASSETS)
+
     def path(self, key: str) -> Path:
-        return self.root / self.paths[key]
+        return self.base / self.paths[key]
 
     @property
     def sessions_dir(self) -> Path:
+        if self.bundled:
+            return self.project / PROJECT_DIRNAME / "sessions"
         return self.path("sessions")
 
     # ----- role access ---------------------------------------------------- #
@@ -79,33 +105,51 @@ class Config:
 
 
 # --------------------------------------------------------------------------- #
-# Loading
+# Discovery
 # --------------------------------------------------------------------------- #
 
 
-def find_root(start: Path | None = None) -> Path:
-    """Walk up from `start` (default cwd) until a directory with config/config.yaml."""
+def find_base(start: Path | None = None) -> tuple[Path, Path]:
+    """Return (base, project). See the module docstring for the order."""
     env = os.environ.get("REHEARSAL_ROOT")
     if env:
-        root = Path(env).expanduser().resolve()
-        if (root / "config" / "config.yaml").exists():
-            return root
-        raise ConfigError(f"REHEARSAL_ROOT={root} has no config/config.yaml")
+        base = Path(env).expanduser().resolve()
+        if not (base / "config.yaml").exists():
+            raise ConfigError(f"REHEARSAL_ROOT={base} has no config.yaml")
+        project = base.parent if base.name == PROJECT_DIRNAME else base
+        return base, project
     here = (start or Path.cwd()).resolve()
     for candidate in [here, *here.parents]:
-        if (candidate / "config" / "config.yaml").exists():
-            return candidate
-    raise ConfigError(
-        "Could not find config/config.yaml. Run from inside the project, or set REHEARSAL_ROOT."
-    )
+        if (candidate / PROJECT_DIRNAME / "config.yaml").exists():
+            return candidate / PROJECT_DIRNAME, candidate
+    return ASSETS, here
 
 
-def load_config(root: Path | None = None) -> Config:
-    root = root or find_root()
-    raw = yaml.safe_load((root / "config" / "config.yaml").read_text(encoding="utf-8")) or {}
+def load_config(root: Path | None = None, project: Path | None = None) -> Config:
+    """`root` is the directory holding config.yaml (a `.rehearsal/` dir, the
+    bundled assets, or any directory laid out the same way)."""
+    if root is not None:
+        base = Path(root).resolve()
+        if not (base / "config.yaml").exists():
+            raise ConfigError(f"{base} has no config.yaml")
+        if project:
+            proj = Path(project).resolve()
+        elif base.name == PROJECT_DIRNAME:
+            proj = base.parent
+        elif _is_under(base, ASSETS):
+            proj = Path.cwd().resolve()  # bundled defaults never own a project
+        else:
+            proj = base
+    else:
+        base, proj = find_base()
+        if project:
+            proj = Path(project).resolve()
+
+    raw = yaml.safe_load((base / "config.yaml").read_text(encoding="utf-8")) or {}
     try:
         cfg = Config(
-            root=root,
+            base=base,
+            project=proj,
             models=dict(raw["models"]),
             effort=dict(raw["effort"]),
             max_tokens=int(raw.get("max_tokens", 8000)),
@@ -127,6 +171,62 @@ def load_config(root: Path | None = None) -> Config:
     return cfg
 
 
+# --------------------------------------------------------------------------- #
+# Project setup
+# --------------------------------------------------------------------------- #
+
+
+def init_project(target: Path, *, force: bool = False) -> list[Path]:
+    """Create `<target>/.rehearsal/` with an editable copy of the defaults and
+    drop the bundled skills into `<target>/.claude/skills/`. Returns the paths
+    written. Existing files are kept unless `force`."""
+    target = Path(target).resolve()
+    dest = target / PROJECT_DIRNAME
+    written: list[Path] = []
+
+    def copy(src: Path, dst: Path) -> None:
+        if dst.exists() and not force:
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        written.append(dst)
+
+    for name in ("config.yaml", "modes.yaml"):
+        copy(ASSETS / name, dest / name)
+    for sub in ("roles", "profile"):
+        for src in sorted((ASSETS / sub).rglob("*.md")):
+            copy(src, dest / src.relative_to(ASSETS))
+    (dest / "sessions").mkdir(parents=True, exist_ok=True)
+    (dest / "scenarios").mkdir(parents=True, exist_ok=True)
+    gi = dest / ".gitignore"
+    if not gi.exists():
+        gi.write_text("# Run outputs may contain work material. Never commit.\nsessions/\n", encoding="utf-8")
+        written.append(gi)
+    for skill_dir in sorted(p for p in (ASSETS / "skills").iterdir() if p.is_dir()):
+        copy(skill_dir / "SKILL.md", target / ".claude" / "skills" / skill_dir.name / "SKILL.md")
+    return written
+
+
+def install_skills(home: Path | None = None, *, force: bool = False) -> list[Path]:
+    """Install the bundled skills at user level (`~/.claude/skills/`) so
+    `/rehearse` works in every project on this machine."""
+    home = Path(home) if home else Path.home()
+    written: list[Path] = []
+    for skill_dir in sorted(p for p in (ASSETS / "skills").iterdir() if p.is_dir()):
+        dst = home / ".claude" / "skills" / skill_dir.name / "SKILL.md"
+        if dst.exists() and not force:
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(skill_dir / "SKILL.md", dst)
+        written.append(dst)
+    return written
+
+
+# --------------------------------------------------------------------------- #
+# Loading helpers
+# --------------------------------------------------------------------------- #
+
+
 def _load_modes(path: Path) -> dict[str, Mode]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     modes: dict[str, Mode] = {}
@@ -140,6 +240,7 @@ def _load_modes(path: Path) -> dict[str, Mode]:
                 panel=list(m["panel"]),
                 emphasis=m["emphasis"].strip(),
                 judge_focus=m["judge_focus"].strip(),
+                judge_schema=str(m.get("judge_schema", "JudgeBrief")),
             )
         except KeyError as e:
             raise ConfigError(f"modes.yaml: mode '{mode_id}' is missing key {e}") from e
@@ -191,3 +292,11 @@ def _read_optional(path: Path) -> str:
         return path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
         return ""
+
+
+def _is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False

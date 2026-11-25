@@ -19,12 +19,13 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from .config import Config, Role
-from .engine import Prompts, load_session, new_session, save_session
+from .engine import Prompts, load_session, new_session, prompts_for, save_session
 from .report import write_report
 from .schemas import (
     AdvocateOutput,
     CallMeta,
     ChallengerOutput,
+    GradeReport,
     JudgeBrief,
     PanelistOutput,
     PanelistResult,
@@ -92,19 +93,20 @@ def init_session(
     input_text: str,
     worry: str | None = None,
     panel_ids: list[str] | None = None,
+    context_paths: list[str] | None = None,
+    answer_key: str | None = None,
 ) -> Path:
     mode = cfg.modes.get(mode_id)
     if mode is None:
         raise ValueError(f"Unknown mode '{mode_id}'. Available: {', '.join(cfg.modes)}")
-    session, _ = new_session(cfg, mode, input_text, worry, panel_ids)
+    session, _ = new_session(cfg, mode, input_text, worry, panel_ids, context_paths=context_paths, answer_key=answer_key)
     return save_session(session, cfg.sessions_dir)
 
 
 def advance(cfg: Config, session_dir: Path, *, skip: list[str] | None = None) -> StageReport:
     session = load_session(session_dir)
-    mode = cfg.modes[session.mode]
     panel_roles = [cfg.panelist(rid) for rid in session.panel_ids]
-    prompts = Prompts(cfg, mode, session.input_text, session.worry)
+    prompts = prompts_for(cfg, session, inline_context=False)  # subagents read files themselves
     skip = set(skip or [])
 
     for stage in STAGE_ORDER:
@@ -128,7 +130,7 @@ def advance(cfg: Config, session_dir: Path, *, skip: list[str] | None = None) ->
                 except (ValidationError, ValueError, json.JSONDecodeError) as e:
                     error = _short(str(e))
             stage_dir.mkdir(parents=True, exist_ok=True)
-            prompt_path.write_text(_render_prompt(exp, out_path), encoding="utf-8")
+            prompt_path.write_text(_render_prompt(exp, out_path, has_context=bool(session.context_paths)), encoding="utf-8")
             pending.append(Pending(exp.key, exp.role.name, exp.schema.__name__, prompt_path, out_path, error))
         if stage == "panel":
             _finalize_panel(session, panel_roles)
@@ -162,8 +164,10 @@ def _expected_for(stage: str, cfg: Config, prompts: Prompts, session: Session, p
         return out
     if stage == "judge":
         sys_, user = prompts.judge(session, panel_roles)
-        return [_Expected("judge", cfg.mechanism("judge"), JudgeBrief, sys_, user)]
+        return [_Expected("judge", cfg.mechanism("judge"), prompts.judge_schema, sys_, user)]
     if stage == "coach_post":
+        if prompts.grading:
+            return []  # no storyline pass in grade mode
         sys_, user = prompts.coach_post(session)
         return [_Expected("coach_post", cfg.mechanism("coach"), Storyline, sys_, user)]
     raise ValueError(stage)
@@ -179,7 +183,7 @@ def _is_ingested(session: Session, key: str) -> bool:
     if key == "challenger":
         return session.challenger is not None
     if key == "judge":
-        return session.judge is not None
+        return session.judge is not None or session.grade is not None
     if key == "coach_post":
         return session.storyline is not None
     return any(r.role_id == key and r.output is not None for r in session.panel)
@@ -197,7 +201,10 @@ def _record(session: Session, exp: _Expected, parsed: BaseModel | None, *, error
     elif key == "challenger":
         session.challenger = parsed  # type: ignore[assignment]
     elif key == "judge":
-        session.judge = parsed  # type: ignore[assignment]
+        if isinstance(parsed, GradeReport):
+            session.grade = parsed
+        else:
+            session.judge = parsed  # type: ignore[assignment]
     elif key == "coach_post":
         session.storyline = parsed  # type: ignore[assignment]
     else:
@@ -224,9 +231,15 @@ def _short(msg: str, limit: int = 600) -> str:
     return msg if len(msg) <= limit else msg[: limit - 3] + "..."
 
 
-def _render_prompt(exp: _Expected, out_path: Path) -> str:
+def _render_prompt(exp: _Expected, out_path: Path, *, has_context: bool = False) -> str:
     system_text = "\n\n".join(str(b.get("text", "")) for b in exp.system)
     schema_json = json.dumps(exp.schema.model_json_schema(), indent=2, ensure_ascii=False)
+    reading_rule = (
+        "You may read the project files listed under '# Project files' in the USER section, and nothing else: "
+        "never other roles' outputs or anything in the session directory. "
+        if has_context else
+        "Do not read other roles' outputs or any other file in the session directory. "
+    )
     return (
         f"# How to respond\n\n"
         f"You are performing one role in a rehearsal. Read the SYSTEM and USER sections below and "
@@ -234,7 +247,7 @@ def _render_prompt(exp: _Expected, out_path: Path) -> str:
         f"    {out_path}\n\n"
         f"The JSON must validate against the SCHEMA section (schema name: {exp.schema.__name__}). "
         f"Write raw JSON only: no Markdown fences, no commentary, no fields outside the schema. "
-        f"Do not read other roles' outputs or any other file in the session directory. "
+        f"{reading_rule}"
         f"Do not reply in chat; the file is the only output.\n\n"
         f"# SYSTEM\n\n{system_text}\n\n"
         f"# USER\n\n{exp.user}\n\n"

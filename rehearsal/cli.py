@@ -9,7 +9,7 @@ import webbrowser
 from pathlib import Path
 
 from . import __version__
-from .config import Config, ConfigError, load_config
+from .config import ASSETS, Config, ConfigError, init_project, install_skills, load_config
 from .debrief import append_to_log, debrief_from_file, format_log_entry, hit_rate, run_debrief
 from .engine import Engine, load_session, save_session
 from .llm import AnthropicLLM, MockLLM
@@ -72,6 +72,13 @@ def _resolve_run_args(cfg: Config, args: argparse.Namespace) -> tuple[str, list[
     return input_text, panel_ids
 
 
+def _context_paths(args: argparse.Namespace) -> list[str]:
+    out: list[str] = []
+    for item in getattr(args, "context", None) or []:
+        out.extend(p.strip() for p in item.split(",") if p.strip())
+    return out
+
+
 def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     try:
         input_text, panel_ids = _resolve_run_args(cfg, args)
@@ -92,13 +99,16 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
 
     engine = Engine(cfg, llm, progress=_progress, mock=args.mock)
     session = asyncio.run(
-        engine.run(mode_id=args.mode, input_text=input_text, worry=args.worry, panel_ids=panel_ids)
+        engine.run(mode_id=args.mode, input_text=input_text, worry=args.worry, panel_ids=panel_ids,
+                   context_paths=_context_paths(args), answer_key=args.answer_key)
     )
     out_dir = save_session(session, cfg.sessions_dir)
     report = write_report(session, out_dir)
 
     if session.judge:
         _progress(f"\nVerdict: {session.judge.verdict.upper()} — {session.judge.headline}")
+    if session.grade:
+        _progress(f"\nScore: {session.grade.score_out_of_10}/10 — {session.grade.headline}")
     if session.errors:
         _progress(f"{len(session.errors)} role(s) failed: {', '.join(session.errors)}")
     print(out_dir)
@@ -185,8 +195,36 @@ def cmd_stage_init(cfg: Config, args: argparse.Namespace) -> int:
     except (ValueError, FileNotFoundError) as e:
         _err(str(e))
         return 2
-    session_dir = init_session(cfg, mode_id=args.mode, input_text=input_text, worry=args.worry, panel_ids=panel_ids)
+    session_dir = init_session(cfg, mode_id=args.mode, input_text=input_text, worry=args.worry, panel_ids=panel_ids,
+                               context_paths=_context_paths(args), answer_key=args.answer_key)
     print(advance(cfg, session_dir).format())
+    return 0
+
+
+def cmd_init(cfg: Config, args: argparse.Namespace) -> int:
+    target = Path(args.directory).resolve()
+    written = init_project(target, force=args.force)
+    print(f"Initialized {target / '.rehearsal'} ({len(written)} files written)")
+    print("Edit .rehearsal/profile/workplace.md and .rehearsal/roles/ to tune the panel for this project.")
+    print("The /rehearse skill is in .claude/skills/. Commit both so every clone of this project has them.")
+    return 0
+
+
+def cmd_install_skills(cfg: Config, args: argparse.Namespace) -> int:
+    written = install_skills(force=args.force)
+    if written:
+        for w in written:
+            print(f"installed {w}")
+    else:
+        print("Skills already installed (use --force to overwrite).")
+    return 0
+
+
+def cmd_where(cfg: Config, _args: argparse.Namespace) -> int:
+    print(f"config:   {cfg.base}{'  (bundled defaults)' if cfg.bundled else ''}")
+    print(f"project:  {cfg.project}")
+    print(f"sessions: {cfg.sessions_dir}")
+    print(f"profile:  {cfg.path('profile')}")
     return 0
 
 
@@ -211,6 +249,8 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("-p", "--panel", help="Comma-separated panel role ids; replaces the mode default.")
     p.add_argument("-a", "--add", help="Comma-separated panel role ids to add to the default.")
     p.add_argument("--language", help="Override output language (e.g. en, zh-TW).")
+    p.add_argument("-c", "--context", action="append", help="Project files or directories the roles may consult (repeatable or comma-separated).")
+    p.add_argument("--answer-key", help="Sealed answer key for grade mode (.b64 or plain text).")
 
 
 # --------------------------------------------------------------------------- #
@@ -224,7 +264,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Pre-meeting rehearsal room: a simulated stakeholder panel for your decks, memos and decisions.",
     )
     p.add_argument("--version", action="version", version=f"rehearse {__version__}")
-    p.add_argument("--root", type=Path, help="Project root containing config/config.yaml (default: search upward from cwd).")
+    p.add_argument("--root", type=Path, help="Directory holding config.yaml (default: nearest .rehearsal/, else bundled defaults).")
     sub = p.add_subparsers(dest="command", required=True)
 
     r = sub.add_parser("run", help="Run a rehearsal by calling the model directly (needs credentials).")
@@ -247,6 +287,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("roles", help="List available roles.").set_defaults(func=cmd_roles)
     sub.add_parser("sessions", help="List past sessions.").set_defaults(func=cmd_sessions)
     sub.add_parser("profile", help="Print the path of the workplace profile.").set_defaults(func=cmd_profile)
+    sub.add_parser("where", help="Show which config, project and sessions directory are in use.").set_defaults(func=cmd_where)
+
+    ini = sub.add_parser("init", help="Set up a project: .rehearsal/ with editable defaults, plus the /rehearse skill.")
+    ini.add_argument("directory", nargs="?", default=".", help="Project directory (default: current).")
+    ini.add_argument("--force", action="store_true", help="Overwrite existing files.")
+    ini.set_defaults(func=cmd_init)
+
+    isk = sub.add_parser("install-skills", help="Install the bundled Claude Code skills at user level (~/.claude/skills).")
+    isk.add_argument("--force", action="store_true")
+    isk.set_defaults(func=cmd_install_skills)
 
     d = sub.add_parser("debrief", help="Record what was actually asked in the real meeting.")
     d.add_argument("session", help="Session id or path (directory or session.json).")

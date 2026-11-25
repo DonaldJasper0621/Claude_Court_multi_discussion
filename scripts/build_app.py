@@ -1,7 +1,8 @@
 """Bundle roles, modes, profile and schemas from the repo into app/dist/index.html.
 
-The repo stays the source of truth: edit roles/*.md, config/modes.yaml or
-profile/workplace.md, run this script, republish app/dist/index.html.
+The package assets stay the source of truth: edit rehearsal/assets/roles/*.md,
+rehearsal/assets/modes.yaml or rehearsal/assets/profile/workplace.md, run this
+script, republish app/dist/index.html.
 
     python scripts/build_app.py
 """
@@ -15,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from rehearsal.config import load_config  # noqa: E402
+from rehearsal.config import ASSETS, load_config  # noqa: E402
 from rehearsal.engine import PANEL_PROTOCOL_EXTRA, PROTOCOL  # noqa: E402
 from rehearsal.schemas import (  # noqa: E402
     AdvocateOutput,
@@ -30,7 +31,7 @@ PLACEHOLDER = "__REHEARSAL_DATA__"
 
 
 def build_data() -> dict:
-    cfg = load_config(ROOT)
+    cfg = load_config(ASSETS, project=ROOT)
     roles = {
         r.id: {"id": r.id, "name": r.name, "layer": r.layer, "body": r.body}
         for r in cfg.roles.values()

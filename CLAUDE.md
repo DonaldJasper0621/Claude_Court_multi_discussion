@@ -1,47 +1,52 @@
 # CLAUDE.md
 
-Rehearsal Room: a pre-meeting rehearsal panel for a Business Analyst. One
-pipeline (Coach → Advocate, Challenger, panel → Judge → Coach), three runtimes
-(claude.ai web app, Claude Code skill, Python CLI). Read `README.md` for the
-map and `docs/DESIGN.md` for the reasoning.
+Rehearsal Room: a pre-meeting rehearsal panel for a Business Analyst that
+lives inside the projects it reviews. One pipeline (Coach → Advocate,
+Challenger, panel → Judge → Coach), three runtimes (Claude Code skill with
+file access, Python CLI, claude.ai web app). `README.md` is the map;
+`docs/DESIGN.md` is the reasoning.
 
 ## Layout
 
 ```
-app/template.html         web app source (edit)        app/dist/index.html  built, published
-roles/mechanism|panel/    role personas (Markdown + YAML header)
-config/config.yaml        models, effort, paths        config/modes.yaml    the five modes
-profile/                  workplace profile and debrief log (default seeds)
-rehearsal/                Python package: schemas, engine, staging, report, cli
-.claude/skills/rehearse/  the /rehearse skill
-examples/inputs|outputs/  sample deck and the report it produced
-sessions/                 run outputs, git-ignored, may hold work material
-tests/                    pytest, no network
-docs/                     DESIGN.md
+rehearsal/                  the package
+  assets/                   bundled defaults: config.yaml, modes.yaml, roles/, profile/, skills/
+  schemas.py                output contracts (single source of truth; the app embeds the JSON Schema)
+  config.py                 discovery: REHEARSAL_ROOT > nearest .rehearsal/ > bundled assets; `init_project`
+  engine.py                 Prompts (shared prompt assembly), async API runner, context_block, read_answer_key
+  staging.py                staged runner driven by an orchestrator (the skill): prompt files in, JSON out
+  report.py + templates/    HTML report
+  cli.py                    rehearse run|stage|init|install-skills|where|modes|roles|sessions|debrief
+app/template.html           web app source; app/dist/index.html is built by scripts/build_app.py
+playground/cobrand-delinquency/   practice case (data, brief, sealed key, its own .rehearsal/)
+docs/DESIGN.md
+tests/                      pytest, mock backend, no network
 ```
 
 ## Commands
 
 ```bash
-pip install -e ".[dev]"                 # once per environment
-pytest                                   # 16 tests, mock backend
-python scripts/build_app.py              # rebuild app/dist/index.html from roles, modes, profile, schemas
-python -m rehearsal.cli run -m preread -i examples/inputs/sample_preread.md --mock
-python -m rehearsal.cli stage init|next  # what the skill drives
+pip install -e ".[dev]"
+pytest                                   # 21 tests
+python scripts/build_app.py              # rebuild app/dist/index.html, then republish to the artifact URL in README
+rehearse init <dir>                      # give a project its own .rehearsal/ and skills
+rehearse where                           # which config/project/sessions are in use
+rehearse stage init -m review -i docs/x.md -c analysis/   # what /rehearse drives
 ```
 
 ## Conventions
 
-- Role behaviour lives in `roles/*.md`, not in code. Fix a persona there.
-- `rehearsal/schemas.py` is the single source of truth for output shapes; the
-  app embeds the generated JSON Schema, so a schema change needs a rebuild.
-- Prompt assembly is mirrored in two places on purpose: `rehearsal/engine.py`
-  (`Prompts`) and the `P` object in `app/template.html`. Keep them aligned.
-- After editing anything under `roles/`, `config/`, `profile/` or
-  `app/template.html`: run the build script and republish `app/dist/index.html`
-  to the existing artifact URL (in README). Never publish to a new URL.
-- Never commit `sessions/`. Never put real customer data, real figures or
-  internal documents anywhere in this repo, including examples.
-- Default model for the CLI is `claude-opus-5-5`; the app uses model tiers
-  (`complex` for Coach and Judge, `default` for the panel).
-- Commit messages: plain, no model names.
+- Role behaviour lives in `rehearsal/assets/roles/*.md` (defaults) or a
+  project's `.rehearsal/roles/` (its copy). Fix a persona there, not in code.
+- Prompt assembly is mirrored on purpose in `engine.py` (`Prompts`) and in the
+  `P` object of `app/template.html`. Keep them aligned when a block changes.
+- After editing anything under `rehearsal/assets/` or `app/template.html`:
+  run the build script and republish `app/dist/index.html` to the existing
+  artifact URL. Never publish to a new URL.
+- Sealed scenario material (`.rehearsal/scenarios/*/*.b64`) is read only by
+  the Judge through `--answer-key`. Never decode, quote or summarize it in
+  chat, commits or files. The practice project's own `CLAUDE.md` repeats this.
+- Never commit any `sessions/` directory. No real customer data, real figures
+  or internal documents anywhere in this repo; synthetic data is fine.
+- Default CLI model is `claude-opus-5-5`; the app uses tiers (`complex` for
+  Coach and Judge, `default` for the panel). Commit messages name no models.

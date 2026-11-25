@@ -22,9 +22,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["rehearsal"]
+include-package-data = true
 
 [tool.setuptools.package-data]
-rehearsal = ["templates/*.j2"]
+rehearsal = ["templates/*.j2", "assets/*.yaml", "assets/**/*.md", "assets/**/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,8 @@
 # Run outputs: may contain work material. Never commit.
 sessions/*
 !sessions/.gitkeep
+**/.rehearsal/sessions/
+**/.rehearsal/inbox/
 
 # Secrets
 .env

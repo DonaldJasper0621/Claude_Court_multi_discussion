@@ -132,6 +132,29 @@ class JudgeBrief(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Grade (practice scenarios: compare the diagnosis with the sealed answer key)
+# --------------------------------------------------------------------------- #
+
+
+class GradeFinding(BaseModel):
+    planted_cause: str = Field(description="One cause or trap from the answer key, in the key's words.")
+    status: Literal["found", "partially_found", "missed"]
+    evidence_in_analysis: str = Field(description="Where the analyst's work shows it, or empty if missed.")
+    note: str = Field(description="What they got right or wrong about it, specifically.")
+
+
+class GradeReport(BaseModel):
+    score_out_of_10: int
+    headline: str = Field(description="One sentence: how close the diagnosis is to the truth.")
+    causes: list[GradeFinding] = Field(description="One entry per planted cause and per trap in the answer key.")
+    false_leads_taken: list[str] = Field(description="Red herrings the analyst treated as causes.")
+    method_gaps: list[str] = Field(description="Analytical habits that caused misses: wrong denominator, no cohorting, etc.")
+    what_was_done_well: list[str]
+    what_to_practice_next: list[str]
+    model_answer_summary: str = Field(description="The diagnosis as it should have been written, in under 200 words.")
+
+
+# --------------------------------------------------------------------------- #
 # Coach post-pass
 # --------------------------------------------------------------------------- #
 
@@ -215,12 +238,15 @@ class Session(BaseModel):
     panel_ids: list[str]
     mock: bool = False
     output_language: str = "en"
+    context_paths: list[str] = Field(default_factory=list, description="Project files the roles may read.")
+    answer_key: Optional[str] = None  # path to a sealed answer key (grade mode)
 
     structure: Optional[StructureAnalysis] = None
     advocate: Optional[AdvocateOutput] = None
     challenger: Optional[ChallengerOutput] = None
     panel: list[PanelistResult] = Field(default_factory=list)
     judge: Optional[JudgeBrief] = None
+    grade: Optional[GradeReport] = None
     storyline: Optional[Storyline] = None
 
     calls: list[CallMeta] = Field(default_factory=list)

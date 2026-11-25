@@ -1,0 +1,4 @@
+campaign_id,channel,start_month,end_month,offer,approval_policy
+CMP-2024-FALL-ONLINE,partner_online,2024-09,2024-11,"15k bonus points after $1,000 spend",standard
+CMP-2025-HOLIDAY,mixed,2025-11,2025-12,10% off first partner purchase,standard
+CMP-2026-SPRING-INSTORE,partner_instore,2026-03,2026-05,20% off first purchase + instant approval at register,expanded (pilot: score floor lowered 20 points for in-store applicants)

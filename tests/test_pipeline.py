@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from rehearsal.config import ConfigError, load_config, split_frontmatter
+from rehearsal.config import ASSETS, ConfigError, load_config, split_frontmatter
 from rehearsal.debrief import append_to_log, format_log_entry, run_debrief
 from rehearsal.engine import Engine, load_session, save_session
 from rehearsal.llm import MockLLM, mock_instance
@@ -18,13 +18,13 @@ from rehearsal.schemas import JudgeBrief, PanelistOutput, Session, StructureAnal
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.fixture(scope="module")
-def cfg():
-    return load_config(ROOT)
+@pytest.fixture
+def cfg(tmp_path):
+    return load_config(ASSETS, project=tmp_path)
 
 
 def test_config_loads_all_modes_and_roles(cfg):
-    assert set(cfg.modes) == {"framing", "method", "preread", "stakeholder", "decide"}
+    assert set(cfg.modes) == {"framing", "method", "preread", "stakeholder", "decide", "review", "grade"}
     for required in ("coach", "advocate", "challenger", "judge"):
         assert cfg.mechanism(required).layer == "mechanism"
     panel_ids = {r.id for r in cfg.panel_roles()}

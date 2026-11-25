@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from rehearsal.cli import main
-from rehearsal.config import load_config
+from rehearsal.config import ASSETS, load_config
 from rehearsal.debrief import debrief_from_file
 from rehearsal.engine import load_session
 from rehearsal.llm import mock_instance
@@ -35,9 +35,7 @@ SCHEMAS = {
 
 @pytest.fixture
 def cfg(tmp_path):
-    c = load_config(ROOT)
-    c.paths["sessions"] = str(tmp_path / "sessions")
-    return c
+    return load_config(ASSETS, project=tmp_path)
 
 
 def _answer_all(report):
@@ -129,13 +127,13 @@ def test_skip_marks_role_failed_and_moves_on(cfg):
 
 
 def test_cli_stage_and_debrief_from_file(cfg, tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("REHEARSAL_ROOT", str(ROOT))
+    monkeypatch.delenv("REHEARSAL_ROOT", raising=False)
     # route sessions into tmp by patching config.yaml paths is heavier; use the API for init and the CLI for next
     sdir = init_session(cfg, mode_id="decide", input_text="A or B", panel_ids=["director"])
     for _ in range(4):
         r = advance(cfg, sdir)
         _answer_all(r)
-    rc = main(["--root", str(ROOT), "stage", "next", str(sdir)])
+    rc = main(["--root", str(ASSETS), "stage", "next", str(sdir)])
     out = capsys.readouterr().out
     assert rc == 0 and "DONE" in out and "REPORT" in out
 

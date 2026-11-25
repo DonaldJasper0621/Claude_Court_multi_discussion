@@ -26,6 +26,7 @@ from .schemas import (
     AdvocateOutput,
     CallMeta,
     ChallengerOutput,
+    GradeReport,
     JudgeBrief,
     PanelistOutput,
     PanelistResult,
@@ -140,6 +141,51 @@ def _dump(model: BaseModel | None) -> str:
     return "(unavailable)" if model is None else json.dumps(model.model_dump(), indent=2, ensure_ascii=False)
 
 
+INLINE_CONTEXT_CHARS = 60_000  # per file, when contents are embedded in the prompt
+
+
+def context_block(paths: list[str], project: Path, *, inline: bool) -> str:
+    """Describe the project files the roles may consult. With `inline`, embed
+    their contents (for a runtime that cannot read files); otherwise list them
+    and tell the role it may open them."""
+    if not paths:
+        return ""
+    lines = ["# Project files"]
+    if inline:
+        lines.append("The analyst's project contains these files. Their contents follow; cite the file when you use it.\n")
+        for rel in paths:
+            fp = (project / rel)
+            try:
+                text = fp.read_text(encoding="utf-8", errors="replace")
+            except (OSError, IsADirectoryError):
+                lines.append(f"## {rel}\n(could not be read)\n")
+                continue
+            clipped = text[:INLINE_CONTEXT_CHARS] + ("\n[... truncated ...]" if len(text) > INLINE_CONTEXT_CHARS else "")
+            lines.append(f"## {rel}\n```\n{clipped}\n```\n")
+    else:
+        lines.append(
+            "The analyst's project contains these files. You may open them with your file-reading tool "
+            "to verify claims, check a query or a metric definition, or look at the data. Read what your "
+            "perspective needs, not everything. Cite the file and line when you rely on it. Do not modify anything.\n"
+        )
+        for rel in paths:
+            fp = project / rel
+            if fp.is_dir():
+                lines.append(f"- {fp}/ (directory; list it first)")
+            else:
+                lines.append(f"- {fp}")
+    return "\n".join(lines) + "\n"
+
+
+def read_answer_key(path: Path) -> str:
+    """Sealed answer keys are base64 so nobody reads them by accident."""
+    raw = path.read_bytes()
+    if path.suffix == ".b64":
+        import base64
+        return base64.b64decode(raw).decode("utf-8")
+    return raw.decode("utf-8")
+
+
 # --------------------------------------------------------------------------- #
 # Prompt assembly (shared by the async engine and the staged runner)
 # --------------------------------------------------------------------------- #
@@ -148,11 +194,32 @@ def _dump(model: BaseModel | None) -> str:
 class Prompts:
     """Builds (system_blocks, user_text) for every role call in a run."""
 
-    def __init__(self, cfg: Config, mode: Mode, input_text: str, worry: str | None) -> None:
+    def __init__(
+        self,
+        cfg: Config,
+        mode: Mode,
+        input_text: str,
+        worry: str | None,
+        *,
+        context_paths: list[str] | None = None,
+        answer_key_text: str | None = None,
+        inline_context: bool = False,
+    ) -> None:
         self.cfg = cfg
         self.mode = mode
         self.profile_block = _profile_block(cfg)
-        self.material = _material_block(mode, input_text, worry)
+        self.material = _material_block(mode, input_text, worry) + "\n" + context_block(
+            context_paths or [], cfg.project, inline=inline_context
+        )
+        self.answer_key_text = answer_key_text
+
+    @property
+    def judge_schema(self) -> type[BaseModel]:
+        return GradeReport if self.mode.judge_schema == "GradeReport" else JudgeBrief
+
+    @property
+    def grading(self) -> bool:
+        return self.judge_schema is GradeReport
 
     def _sys(self, role: Role, *, panel: bool) -> list[dict[str, Any]]:
         return _system_blocks(self.cfg, role, self.profile_block, panel=panel)
@@ -192,7 +259,12 @@ class Prompts:
             parts.append(f"## {pr.name} (`{pr.id}`)\n" + _dump(result.output if result else None))
         if session.errors:
             parts.append("# Roles that failed to respond\n" + "\n".join(f"- {k}: {v}" for k, v in session.errors.items()))
-        parts.append("# Task\nProduce the pre-meeting brief described in your role, following the output schema.")
+        if self.grading:
+            key = self.answer_key_text or "(no answer key was provided; grade against your own best judgment and say so)"
+            parts.append("# Sealed answer key (only you see this; the analyst and the panel do not)\n" + key)
+            parts.append("# Task\nGrade the analyst's diagnosis against the answer key as described in your role and the judge focus, following the GradeReport schema.")
+        else:
+            parts.append("# Task\nProduce the pre-meeting brief described in your role, following the output schema.")
         return self._sys(role, panel=False), "\n\n".join(parts)
 
     def coach_post(self, session: Session) -> tuple[list[dict[str, Any]], str]:
@@ -207,7 +279,17 @@ class Prompts:
         return self._sys(role, panel=False), user
 
 
-def new_session(cfg: Config, mode: Mode, input_text: str, worry: str | None, panel_ids: list[str] | None, *, mock: bool = False) -> tuple[Session, list[Role]]:
+def new_session(
+    cfg: Config,
+    mode: Mode,
+    input_text: str,
+    worry: str | None,
+    panel_ids: list[str] | None,
+    *,
+    mock: bool = False,
+    context_paths: list[str] | None = None,
+    answer_key: str | None = None,
+) -> tuple[Session, list[Role]]:
     panel_ids = list(panel_ids) if panel_ids else list(mode.panel)
     panel_roles = [cfg.panelist(rid) for rid in panel_ids]
     now = datetime.now()
@@ -221,8 +303,22 @@ def new_session(cfg: Config, mode: Mode, input_text: str, worry: str | None, pan
         panel_ids=panel_ids,
         mock=mock,
         output_language=cfg.output_language,
+        context_paths=list(context_paths or []),
+        answer_key=answer_key,
     )
     return session, panel_roles
+
+
+def prompts_for(cfg: Config, session: Session, *, inline_context: bool) -> Prompts:
+    mode = cfg.modes[session.mode]
+    key_text = None
+    if session.answer_key:
+        kp = Path(session.answer_key)
+        if not kp.is_absolute():
+            kp = cfg.project / kp
+        key_text = read_answer_key(kp)
+    return Prompts(cfg, mode, session.input_text, session.worry, context_paths=session.context_paths,
+                   answer_key_text=key_text, inline_context=inline_context)
 
 
 # --------------------------------------------------------------------------- #
@@ -245,12 +341,15 @@ class Engine:
         input_text: str,
         worry: str | None = None,
         panel_ids: list[str] | None = None,
+        context_paths: list[str] | None = None,
+        answer_key: str | None = None,
     ) -> Session:
         mode = self.cfg.modes.get(mode_id)
         if mode is None:
             raise ValueError(f"Unknown mode '{mode_id}'. Available: {', '.join(self.cfg.modes)}")
-        session, panel_roles = new_session(self.cfg, mode, input_text, worry, panel_ids, mock=self.mock)
-        prompts = Prompts(self.cfg, mode, input_text, worry)
+        session, panel_roles = new_session(self.cfg, mode, input_text, worry, panel_ids, mock=self.mock,
+                                           context_paths=context_paths, answer_key=answer_key)
+        prompts = prompts_for(self.cfg, session, inline_context=True)  # the API path cannot read files itself
         coach = self.cfg.mechanism("coach")
 
         # 1. Coach pre-pass
@@ -274,9 +373,13 @@ class Engine:
         for role, output in zip(panel_roles, results[2:]):
             session.panel.append(PanelistResult(role_id=role.id, role_name=role.name, output=output, error=session.errors.get(role.id)))
 
-        # 3. Judge
-        self.progress("Judge: synthesizing the brief")
+        # 3. Judge (brief, or grade against the answer key)
         sys_, user = prompts.judge(session, panel_roles)
+        if prompts.grading:
+            self.progress("Judge: grading against the answer key")
+            session.grade = await self._call(session, self.cfg.mechanism("judge"), GradeReport, system=sys_, user=user, kind="judge")
+            return session
+        self.progress("Judge: synthesizing the brief")
         session.judge = await self._call(session, self.cfg.mechanism("judge"), JudgeBrief, system=sys_, user=user, kind="judge")
 
         # 4. Coach post-pass

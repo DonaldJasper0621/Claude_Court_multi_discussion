@@ -20,7 +20,7 @@ output_language: en
 
 paths:
   roles: roles
-  modes: config/modes.yaml
+  modes: modes.yaml
   profile: profile/workplace.md
   debrief_log: profile/debrief_log.md
   sessions: sessions
