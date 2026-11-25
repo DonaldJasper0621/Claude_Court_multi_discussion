@@ -24,14 +24,137 @@
     "/home/user/Claude_Court_multi_discussion/playground/cobrand-delinquency/data/cobrand_delinquency/monthly_performance.csv"
   ],
   "answer_key": null,
-  "structure": null,
+  "structure": {
+    "one_line_restatement": "Once the June denominator change is stripped out, co-brand 30+ DPD rose 1.06 pp from May to November; the August-September spike was the PAY-4471 autopay failure, the October-November residual is the April credit line program showing up as high-utilization delinquency, and the weakest customers came through the partner's in-store register, so Risk should re-tier the autopay accounts, the partner should tighten in-store approvals, and wave 4 of the CLI program should pause.",
+    "leads_with_answer": false,
+    "answer_first_note": "The answer is in section 6, the last numbered section, and even there it is five recommendations with no governing thought above them. Section 1 opens with a reporting housekeeping point (0.3 to 0.5 pp of definition drift), which is the least decision-relevant finding in the document. The Director will interrupt at the end of section 1 asking 'what are you asking me to decide'. Read as a ghost deck, the section titles ('How much of the rise is real', 'Driver one', 'Driver two', 'Which customers', 'Sizing', 'Recommendations') are topic labels, not messages: the sequence tells the reader where the analyst looked, not what they found. The answer also serves two audiences at once: section 4 ends with 'that is the message for the partner call' while sections 2, 3 and 6 are internal Risk decisions. The document needs one headline sentence at the top (the 1.06 pp rise splits into a closed platform incident and an open credit problem that is concentrated in two identifiable cohorts; here is the decision for each), and the partner message should be separated from the Director asks, because the Director will be asked to approve what is said to the partner, not to hear it as a finding.",
+    "central_question": "Why has co-brand 30+ DPD risen since May on a consistent definition, how much of the rise is a one-off versus ongoing credit deterioration, and what should Risk, Reporting and the partner each do about it before the partner call?",
+    "issue_tree": [
+      {
+        "sub_question": "How much of the published rise is measurement rather than performance?",
+        "sub_points": [
+          "June v2 definition changed the denominator to active accounts while the numerator stayed on all open accounts (section 1, q1_series_consistent.sql lines 6-10)",
+          "Restated on one basis the rise is +1.06 pp (1.79% to 2.85%), not +1.45 pp; about 0.4 pp of the November headline is definitional",
+          "The September spike is real in account counts (260 vs 107)"
+        ]
+      },
+      {
+        "sub_question": "What caused the transient August-September spike?",
+        "sub_points": [
+          "PAY-4471 autopay vendor migration: 732 failed debits across 416 accounts, fix deployed 27 Sep (section 2, ops_notes.md 2026-08 entry)",
+          "Affected accounts ran 1.3% 30+ in July, 15.0% in August, 22.5% in September, spread across all four tiers, so framed as a platform event not a credit event",
+          "61 of 206 August and 87 of 260 September 30+ accounts had a failed debit in that month; contribution counted as zero from October"
+        ]
+      },
+      {
+        "sub_question": "What explains the October-November level that remains after the incident is removed?",
+        "sub_points": [
+          "'Other' delinquents run 107 to 181 May to November, 1.1 to 1.3 pp above May, labelled credit deterioration (section 2)",
+          "Cross-sectional November utilization bands: 0.53% under 30% utilization vs 8.21% at 90%+ (section 3)",
+          "April CLI wave 3 cohort (827 accounts, tiers B and C, defined as current line above origination line, q2_cli_cohort.sql line 20) at 74% utilization and 5.44% 30+, 13% of book but 25% of November 30+",
+          "Conclusion drawn: higher lines led to higher utilization, therefore the April increases are the cause of the residual"
+        ]
+      },
+      {
+        "sub_question": "Which acquisition cohorts carry the delinquency?",
+        "sub_points": [
+          "CMP-2026-SPRING-INSTORE at 5.70% (28 accounts) and climbing monthly; CMP-2025-HOLIDAY at 5.26% (13 accounts), already 4.94% in August (section 4)",
+          "Accounts booked in-store March to May run 5.70% vs 3.20% for same-month other channels and 2.60% for the rest of the book",
+          "Conclusion drawn: the partner's in-store customer base is weaker, which is the partner-call message",
+          "Ruled out: tier A flat, November utilization jump is seasonal, state mix unchanged"
+        ]
+      },
+      {
+        "sub_question": "How big is the problem in dollars?",
+        "sub_points": [
+          "$101k incremental charge-offs June to November vs prior six months, about $200k annualised (section 5)",
+          "30+ balances doubled from $240k to $495k as the pipeline for next year's losses"
+        ]
+      },
+      {
+        "sub_question": "What should each party do?",
+        "sub_points": [
+          "Risk: re-tier the autopay-impacted accounts that went 30+; pause CLI wave 4 and re-score wave 3 above 90% utilization",
+          "Partner: tighten who is offered the card at the register",
+          "Reporting: restate the pack on one definition back to 2025",
+          "Collections: close out PAY-4471 fee reversals",
+          "Open items: CLI cohort roll rates vs non-recipients, state view, one-pager"
+        ]
+      }
+    ],
+    "mece_gaps": [
+      "No bridge from the headline to the drivers. The residual is +74 accounts (107 to 181) on the consistent basis, yet section 3 claims the CLI cohort (45 of November's 30+) and section 4 claims the in-store cohort (28) and holiday cohort (13) without ever adding them up, netting overlaps, or showing what is left unexplained. On the files, the CLI cohort was all opened 2023-2025 and the in-store spring cohort in 2026, so they do not overlap, but roughly half of November's 30+ accounts sit in none of the three named cohorts and the document never says so. A reader cannot tell whether the drivers are rivals, complements, or partial.",
+      "Section 3 and section 4 both answer 'what explains the post-incident residual' and each declares itself the cause (section 3: 'therefore the cause of the post-incident residual'; section 4: 'that is the message for the partner call'). Two sections, one sub-question, no reconciliation of which is primary.",
+      "Section 4 presents the same population twice as two findings: the CMP-2026-SPRING-INSTORE campaign cut and the 'in-store, opened Mar-May 2026' channel cut are the same accounts by construction (q4_campaign_channel_cut.sql line 12-13 attributes the campaign from channel plus open month; line 19 defines the segment identically), which is why both show 5.70%. The campaign table and the channel comparison are one branch, not two.",
+      "The CMP-2025-HOLIDAY branch is overlapping by construction too: campaigns.csv line 3 gives it channel 'mixed', and q4 line 12 then attributes every account opened November-December 2025 in any channel to it. It is a vintage, not a campaign cohort, and it is sized against the other campaigns as if it were comparable.",
+      "Missing branch: the incident's lingering effect after 27 Sep. The tree jumps from 'incident contribution is zero from October' to 'the residual is credit deterioration' with no branch for accounts that failed a debit in August or September and were still 30+ or rolled to 60+ in October and November. The author's own query (q3_autopay_incident.sql lines 10-16) produces the affected-cohort rate for every month June to November; the memo reports only July, August and September from it.",
+      "Missing branch under 'which customers': our own approval policy. campaigns.csv line 4 records that the spring in-store campaign ran an 'expanded' approval policy with the score floor lowered 20 points, and ops_notes.md 2026-03 records an instant-approval pilot at the register. The tree has a branch for 'who the partner sends us' and none for 'what we approved', so the partner message rests on a comparison that is not controlled for the one policy change the files document.",
+      "Sizing (section 5) is not connected to the drivers. $101k of incremental loss is never split between incident, CLI cohort and in-store cohort, so the recommendations ordered 'by impact' in section 6 have no impact figure attached to any of them.",
+      "Denominators are not held constant across branches after section 1 made that the opening point: section 1 is on all open accounts, section 3's utilization table and section 4's campaign tables are active-only (q2 line 11, q4 lines 5-8), the CLI cohort rate in q2 line 32 is all-open, and the 2.85% book comparator is all-open. Cohort-to-book comparisons therefore mix bases inside single sentences."
+    ],
+    "logic_breaks": [
+      {
+        "claim": "In October and November the incident contribution is zero, consistent with the 27 Sep fix. Stripping it out ... that residual is credit deterioration.",
+        "where_in_material": "Section 2, 'Contribution' paragraph",
+        "why_it_does_not_follow": "The zero is produced by the counting rule, not observed. q3_autopay_incident.sql line 21 counts a 30+ account as incident-related only if autopay_failed = 1 in that same month; once the fix is deployed no month can have a failed debit, so the contribution is zero by construction. An account that missed two debits in August and September and is still 30+ or 60+ in October is classified as 'other' and then relabelled 'credit deterioration'. The document's own second query (q3 lines 10-16) tracks the affected cohort by month and would show whether they returned to their July 1.3% rate; those October and November figures are omitted. Without them the step from 'residual' to 'credit deterioration' is an assertion."
+      },
+      {
+        "claim": "Higher lines led to higher utilization, and higher utilization is where the delinquency sits; the April line increases are therefore the cause of the post-incident residual.",
+        "where_in_material": "Section 3, final paragraph",
+        "why_it_does_not_follow": "The evidence is a cross-sectional November utilization table and a single cohort rate with no comparison group. The 'therefore' needs (a) the same B and C accounts that did not receive a line increase, and (b) the cohort's delinquency before April; neither is in the section. The author knows this: 'Roll rates ... for the CLI cohort against tier B and C non-recipients' is listed as an open item for days 6 to 8, which means the conclusion is stated before its own test is run. Structurally the section should read as a hypothesis with a pending test, not as a cause."
+      },
+      {
+        "claim": "Same months, same macro, same product; the only difference is who walked up to the register. The partner's in-store customer base is weaker than its online base and weaker than ours.",
+        "where_in_material": "Section 4, 'The in-store story is a partner story' paragraph",
+        "why_it_does_not_follow": "'The only difference' is contradicted by two listed project files. campaigns.csv line 4 shows CMP-2026-SPRING-INSTORE ran with approval_policy 'expanded (pilot: score floor lowered 20 points for in-store applicants)', and ops_notes.md 2026-03 records 'Instant-approval pilot at register enabled'. Spring in-store accounts were approved under a different policy from spring online and bank-direct accounts, so the 5.70% vs 3.20% gap is at least as consistent with our approval change as with the partner's customer base. The sentence that carries the partner message is the one claim in the document for which the alternative explanation sits in the analyst's own folder."
+      },
+      {
+        "claim": "The 416 affected accounts showed 30+ delinquency at 15 to 22% during the incident ... the behaviour is on record and the standard roll-rate on it is 25% to 60 DPD.",
+        "where_in_material": "Section 6, recommendation 1",
+        "why_it_does_not_follow": "Section 2 established that these accounts were clean before the migration, span all tiers, and that 'this is a platform event, not a credit event'. Recommendation 1 then treats the same delinquency as credit behaviour that justifies a twelve-month APR step-up. The argument contradicts itself within four sections; either the incident delinquency is informative about credit risk, in which case section 2's framing is wrong, or it is not, in which case recommendation 1 has no premise. It is also listed first 'in order of impact' with a cost of 'none to us' and no sizing."
+      },
+      {
+        "claim": "Recommendations, in order of impact.",
+        "where_in_material": "Section 6 heading and ordering",
+        "why_it_does_not_follow": "No recommendation carries a dollar or account-count impact, and section 5's $101k is not allocated across drivers. Restating the pack (recommendation 4) removes 0.4 pp from the partner's headline and is arguably the largest single number in the document, yet it is ranked fourth. The ordering claim has no evidence beneath it."
+      },
+      {
+        "claim": "The cohort is 13% of the book but 25% of November's 30+ accounts.",
+        "where_in_material": "Section 3, last sentence",
+        "why_it_does_not_follow": "Over-representation versus the book does not establish that the line increase caused it. Wave 3 was targeted at mid-tier accounts (ops_notes.md 2026-04: 'eligible mid-tier accounts'), and the cohort is entirely tier B and C, so it was selected from the part of the book that already carries more delinquency than tier A, which section 4 shows is flat at 0.77%. The relevant comparator is B and C non-recipients, not the whole book; without it the 13% vs 25% ratio is a description of who was selected, not an effect of what was done to them."
+      }
+    ],
+    "frameworks_used": [
+      {
+        "framework": "Driver tree (bridge from headline to drivers)",
+        "why_here": "The document names three drivers (autopay incident, CLI cohort, in-store cohort) and a 1.06 pp rise, but never decomposes the rise into them. Building the bridge exposes the two structural problems at once: the drivers are stated as rival 'causes' rather than additive components, and about half of November's 30+ accounts belong to none of the named cohorts, which the current structure hides. It also forces the incident's post-fix tail to appear as its own bar instead of being absorbed into 'credit deterioration'."
+      },
+      {
+        "framework": "Pyramid Principle (answer first, governing thought)",
+        "why_here": "The recommendations sit in section 6 and the first section is a reporting-definition correction. Applying the pyramid shows there is currently no governing thought: the five recommendations are not children of one sentence, and two of them (re-tier autopay accounts; pause CLI) rest on premises that sections 2 and 3 do not establish. Forcing a one-line answer at the top also surfaces that the document is written for two audiences (Director approval and partner call) and needs the partner message split out as a separate branch the Director is asked to approve."
+      }
+    ]
+  },
   "advocate": null,
   "challenger": null,
   "panel": [],
   "judge": null,
   "grade": null,
   "storyline": null,
-  "calls": [],
+  "calls": [
+    {
+      "role_id": "coach_pre",
+      "model": "orchestrated",
+      "seconds": 0.0,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      },
+      "error": null
+    }
+  ],
   "errors": {},
   "debrief": null
 }

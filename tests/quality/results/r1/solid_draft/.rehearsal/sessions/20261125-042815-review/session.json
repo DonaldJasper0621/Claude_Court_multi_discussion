@@ -24,14 +24,126 @@
     "/home/user/Claude_Court_multi_discussion/playground/cobrand-delinquency/data/cobrand_delinquency/monthly_performance.csv"
   ],
   "answer_key": null,
-  "structure": null,
+  "structure": {
+    "one_line_restatement": "The published rise from 1.8% (May) to 3.2% (November) is one-third measurement artefact (definition change in June, mixed v2 numerator, a spring base diluted by a double-sized vintage) and two-thirds real (+1.01 pp on a consistent v2 basis), and the real part is three separate events, not one: the September spike was a bank-caused autopay failure (68% of the Jul-Sep jump), the November level over May is mostly a large spring vintage seasoning on schedule plus our own April line-increase wave, and the only credit-quality signal is a small MOB 7-8 excess in the lowered-floor campaign cohort; the pre-2026 book improved, so remediate PAY-4471, pause CLI wave 4, do not carry the lowered floor into holiday, and restate the KPI pack.",
+    "leads_with_answer": false,
+    "answer_first_note": "The answer is in two places, both at the bottom. The structural verdict ('This is not a book-wide deterioration', Section 3, last line) arrives after one reconciliation table and three cohort cuts, and the actual message the Director will carry ('about two-thirds of the September spike was our payments platform; the November level is mostly a large vintage seasoning normally plus our own line-increase wave; the pre-2026 book has improved') is the 'For the partner' paragraph at the end of Section 5. The document opens instead with 'What the published series actually shows', a ten-row table on two denominators. A Director who asks 'What are you asking me to decide?' and 'What does the partner need to hear?' gets both answers on page 5. The partner paragraph plus the four action headlines should be the first ten lines; Section 1 belongs after the answer as the first supporting pillar ('how much of the rise is real'), with its table in an appendix.",
+    "central_question": "Why did the co-brand 30+ DPD rate move from ~1.8% in spring 2026 to 4.6% in September and 3.2% in November, how much of that movement is real and caused by us, and what should the Director decide before the holiday campaign and the partner conversation?",
+    "issue_tree": [
+      {
+        "sub_question": "How much of the published rise is real rather than measurement?",
+        "sub_points": [
+          "June definition change v1 to v2 accounts for 0.28 pp of the 0.55 pp May-June step (Section 1, bullet 1; q1 lines 18-19 compute both bases).",
+          "The published v2 numerator counts 30+ across all open accounts while the denominator is active only; consistent v2 November is 165/5,591 = 2.95%, not 3.24% (Section 1, bullet 2; q1 line 20 published_recalc_pct reproduces the pack).",
+          "Spring base is diluted: numerator flat Feb-May while the denominator grew 30% from 1,467 new accounts; the pre-March book ran 2.13 in May (Section 1, bullet 3; q1 lines 8-10, 21).",
+          "Resulting 'rise to answer for': 1.94% to 2.95%, +1.01 pp, September peak 4.37% (Section 1, closing paragraph)."
+        ]
+      },
+      {
+        "sub_question": "What caused the September spike (Jul to Sep, +121 accounts)?",
+        "sub_points": [
+          "Autopay debits not submitted in Aug (11.87%) and Sep (11.90%), zero in other months; 416 accounts hit, 395 current in July (Section 2c; q4 lines 2-7).",
+          "Cohort rate 1.44% Jul to 23.32% Sep; September stacks the August cohort rolling to 60+ with the September cohort arriving at 30 (Section 2c; q4 lines 17-18 split b30 and b60_plus).",
+          "Controls: autopay-without-failure 1.30/2.16/1.62, non-autopay 3.54/4.00/4.35 (Section 2c).",
+          "Attribution: +82 of +121 (68%) of the Jul-Sep spike (Section 3 table).",
+          "Remediation sizing: 130 ever-30+, 126 current in July, 27 still 60+, 15 charged off (Section 2c; q4 lines 38-45)."
+        ]
+      },
+      {
+        "sub_question": "What caused the level change from May to November (+63 accounts) that persists after the spike cured?",
+        "sub_points": [
+          "Spring organic vintage (874 accounts, +19, 30%): seasons at or below the Jun-Oct 2025 benchmark at every MOB; contribution is mix from a vintage twice the usual size reaching MOB 6-8 (Section 2a; q2 lines 20-35).",
+          "Spring campaign vintage (517 accounts, +20, 32%; 47% from a July base): tracks benchmark through MOB 6, above it at MOB 7-8 (5.41 vs 4.51, 6.21 vs 4.67 on 314 and 145 accounts); consistent with the 20-point score-floor reduction (Section 2a; campaigns.csv line 4).",
+          "April CLI treated cohort (801 accounts, +12, 19%; 3% from July): lines raised x1.25, utilization 0.55 to 0.73 in two months, 30+ rate 2-3x matched peers since May (Section 2b; q3 lines 24-34 define the peer arm).",
+          "Post-May vintage (611, +8) and rest of book (3,781, -7, 2.13% to 1.99%) (Section 3 table)."
+        ]
+      },
+      {
+        "sub_question": "What is not a driver?",
+        "sub_points": [
+          "Holiday seasonality: Nov 2026 is below Oct 2026, unlike Nov 2025 (Section 4; q6 lines 2-7).",
+          "Texas moves with the book: 15% of 30+ on 14% of actives (Section 4; q6 lines 9-16).",
+          "Affiliate and 2025 holiday campaign: +6 of +63 combined (Section 4; q6 lines 18-27).",
+          "Book-wide FICO drift: the 4-point dip is the campaign entering; flat May to November (Section 4; q6 lines 29-34)."
+        ]
+      },
+      {
+        "sub_question": "What should the Director decide?",
+        "sub_points": [
+          "Finish and prove PAY-4471 remediation: fee/interest reversal, bureau correction, review of 15 charge-offs and 27 still-60+ (Section 5, action 1; ops_notes.md lines 8-9).",
+          "Pause CLI wave 4, add utilization cap and drawdown trigger (Section 5, action 2).",
+          "Restore the standard score floor for the holiday campaign (Section 5, action 3).",
+          "Restate the KPI pack with v1 and v2 side by side and an MOB-matured view (Section 5, action 4).",
+          "Partner message: platform failure and our own policy actions, not their customers' credit (Section 5, 'For the partner')."
+        ]
+      }
+    ],
+    "mece_gaps": [
+      "The question 'why did the number move' is never split into 'expected given what we did' versus 'unexpected and actionable'. The spring organic vintage is 30% of the May-November rise (Section 3) and is explicitly benign (Section 2a: 'seasoning normally, not a credit problem'), yet it sits in the same table and the same section as the CLI wave and the autopay failure, and has no action attached. Without an explicit benign branch, the Director reads a six-row attribution table where the two biggest rows (campaign 32%, organic 30%) carry opposite meanings.",
+      "The same phenomenon, the double-sized spring vintage, is explained three times in three sections: Section 1 bullet 3 (denominator dilution of the spring base), Section 2a (organic seasoning as a mix effect at MOB 6-8), and Section 4 bullet 4 (the FICO dip is the campaign entering). These are one argument ('a vintage twice the usual size depresses the spring rate and lifts the autumn rate') and should be one branch.",
+      "The spring campaign vintage is not decomposed into 'expected seasoning' and 'excess over benchmark'. Its +20 accounts are the largest row in the May-November attribution and the largest (47%) from July, but the only part the analyst treats as a signal is the MOB 7-8 excess. The number that would close this branch (how many of the +20 the benchmark curve would have predicted) is computable from q2 and is absent, so the campaign branch overlaps both the 'benign seasoning' and the 'credit signal' branches.",
+      "The two time windows (Jul-Sep spike; May-Nov level) are separated only in Section 3. Sections 2a-2c are organized by cohort, not by question, so the reader meets the CLI cohort and the campaign cohort before knowing which of the two movements each explains. The autopay cut (2c) answers the spike question; 2a and 2b answer the level question; the order 2a, 2b, 2c reverses the magnitude order of the events.",
+      "The ranking criterion for Section 5 ('ordered by impact') is not defined and does not match the attribution shares: CLI is 19% (May base) or 3% (July base) of the rise but is action 2; the campaign floor is the largest share and is action 3 'as a precaution'. The implicit criterion is regulatory and partner exposure, not share of the rise; that criterion needs to be named or the ordering reads as inconsistent with Section 3.",
+      "The decision asked of the Director is never stated as a question. Each action names an owner (Payments Ops, Credit Risk, Portfolio Director, Portfolio Analytics) but not what the Director personally must approve, fund, or carry to the partner, and by when (the holiday campaign is already active per ops_notes.md line 10)."
+    ],
+    "logic_breaks": [
+      {
+        "claim": "The April CLI cohort 'is the earliest real driver and it is what the consistent June-July rise (2.23 to 2.33 on v2) is made of.'",
+        "where_in_material": "Section 2b, final paragraph.",
+        "why_it_does_not_follow": "No number in the document or the queries covers June. q3 (line 43) samples March, May, July, September, November; q5 (line 27) samples May, July, September, November. The attribution table shows the CLI cohort contributed +1 account from July to November and +12 from May to November, which says the CLI damage was in the numerator by May, not that it drove the June-July step. The 0.10 pp June-July rise on v2 is 127-125 = roughly 2 accounts on a 5,400 base; attributing it to a named cohort without a June cut is an assertion, not a finding. Either add June to q5 or drop the sentence."
+      },
+      {
+        "claim": "'On that basis the rise to answer for is 1.94% (May) to 2.95% (November), +1.01 pp.'",
+        "where_in_material": "Section 1, 'Definition used from here on' paragraph, immediately after bullet 3.",
+        "why_it_does_not_follow": "Bullet 3 has just argued that the May base is artificially low by 0.3-0.5 pp because 1,467 one-to-two-month-old accounts dilute the denominator, and that the pre-March book ran 2.13 in May. The next paragraph then anchors the entire attribution on the 1.94% May figure the author has called artificial. Both cannot be the frame. If the base is understated, the underlying rise is roughly +0.5 to +0.7 pp, not +1.01, and the attribution shares change (the spring vintages' share falls because part of their 'contribution' is the base effect unwinding). The material needs to choose: either the May base is the frame and bullet 3 is a footnote, or the underlying-book frame is the headline and the +1.01 is the partner-facing reconciliation."
+      },
+      {
+        "claim": "The campaign cohort's excess is 'modest and the base is still small' and the partner should hear 'their customers' credit is not the story'.",
+        "where_in_material": "Section 2a last sentence; Section 5 'For the partner' paragraph.",
+        "why_it_does_not_follow": "Section 3 shows the campaign vintage is the single largest contributor to the May-November rise (+20 of +63, 32%) and 47% from a July base, with its rate going 1.35% to 6.03%, the highest November rate of any group. 'Not the story' follows only if most of that +20 is seasoning the benchmark would have predicted; the material asserts that (tracks benchmark through MOB 6) but never computes the expected count. As written, the reader sees the largest row in the attribution table described as a narrow exception. The missing step is one line: 'at benchmark rates the campaign vintage would have added about [N] 30+ accounts by November; it added 20; the excess is [20-N].'"
+      },
+      {
+        "claim": "'On a consistent v2 basis November is 165/5,591 = 2.95%, not 3.24%' and this is the definition 'used from here on'.",
+        "where_in_material": "Section 1 bullet 2 and closing paragraph; contradicted by Section 7, open question 1.",
+        "why_it_does_not_follow": "Open question 1 says the 16 accounts at 60/90 DPD in open_no_balance status with zero balance may or may not belong in the numerator and that this 'decides the final v2 restatement'. Section 1 states 2.95% as settled and Section 5 action 4 commits to a 0.29 pp restatement to the partner. A number the analyst flags as undecided on page 7 cannot be the headline on page 1. Structurally, the 2.95% should be presented as 'between 2.95% and 3.24% depending on the treatment of 16 zero-balance 60/90 accounts, to be resolved before the pack is restated', or the open question should be closed before this draft goes up."
+      },
+      {
+        "claim": "'This is not a book-wide deterioration.'",
+        "where_in_material": "Section 3, final line (bold).",
+        "why_it_does_not_follow": "The claim rests on 'rest of book' improving from 64 to 57 accounts, but 'rest of book' is a residual defined after five named groups are removed in a stated priority order (q5 lines 13-18). Any account touched by a 2026 event is assigned to a named group first, so the residual improving is partly by construction. The conclusion is defensible but the headline is stronger than the evidence: what is shown is 'the 3,781 accounts untouched by any 2026 event or vintage improved'. Say that; it is also the more useful sentence for the partner because it names what was tested."
+      }
+    ],
+    "frameworks_used": [
+      {
+        "framework": "Pyramid Principle / answer first",
+        "why_here": "This material has three separate answers that the reader only learns are separate in Section 3: a measurement artefact, a bank-caused platform failure that explains the spike, and two policy decisions that explain the level. Because the document opens with the reconciliation table, the Director spends four sections believing the question is 'what is the right number' when the real top-line is 'the spike and the level are different events and neither is the partner's customers'. Putting the 'For the partner' paragraph and the four action headlines first, then Section 1 as pillar one ('how much is real'), Section 2c as pillar two ('the spike'), Sections 2a-2b as pillar three ('the level'), and Section 4 as the rule-outs, lets each table be read as evidence for a claim already stated instead of as a puzzle to be solved."
+      },
+      {
+        "framework": "Issue tree (MECE) with an explicit benign-versus-actionable split",
+        "why_here": "The six-group attribution table in Section 3 is already a complete driver decomposition of the numerator change, but it mixes rows that mean 'nothing is wrong' (spring organic, post-May vintage, rest of book) with rows that mean 'we caused this' (autopay, CLI) and one row that is both (campaign: mostly seasoning, partly a floor signal). Rebuilding the tree as 'measurement / expected given our actions / unexpected and ours / unexpected and the partner's' forces the one missing computation (how much of the campaign's +20 is benchmark seasoning), collapses the three scattered explanations of the spring vintage into one branch, and makes the Section 5 ordering follow from the tree rather than from an undefined 'impact'."
+      }
+    ]
+  },
   "advocate": null,
   "challenger": null,
   "panel": [],
   "judge": null,
   "grade": null,
   "storyline": null,
-  "calls": [],
+  "calls": [
+    {
+      "role_id": "coach_pre",
+      "model": "orchestrated",
+      "seconds": 0.0,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      },
+      "error": null
+    }
+  ],
   "errors": {},
   "debrief": null
 }
