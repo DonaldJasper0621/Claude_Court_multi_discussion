@@ -1,0 +1,106 @@
+# Co-brand card 30+ DPD: draft diagnosis (day 6, work in progress)
+
+**Analyst draft for Director, Co-brand Card Portfolio. Numbers trace to `queries/q1`–`q6`.**
+
+## 1. What the published series actually shows
+
+The pack's series mixes two definitions and a fast-growing denominator. Restated (`q1_published_series_restated.sql`):
+
+| Month | Published | v1 basis: 30+ open / all open | v2 basis: 30+ active / active |
+|---|---|---|---|
+| 2026-02 | 2.28 | 2.28 | 2.42 |
+| 2026-03 | 1.96 | 1.96 | 2.06 |
+| 2026-04 | 1.67 | 1.67 | 1.83 |
+| 2026-05 | 1.79 | 1.79 | 1.94 |
+| 2026-06 | 2.34 | 2.06 | 2.23 |
+| 2026-07 | 2.53 | 2.23 | 2.33 |
+| 2026-08 | 3.70 | 3.26 | 3.59 |
+| 2026-09 | 4.58 | 4.03 | 4.37 |
+| 2026-10 | 3.54 | 3.11 | 3.21 |
+| 2026-11 | 3.24 | 2.85 | 2.95 |
+
+Three things follow.
+
+- **The June step.** Of the published May-to-June jump of 0.55 pp (1.79 to 2.34), 0.28 pp is the definition change: June on the v1 basis is 2.06. Roughly half of the June "deterioration" is arithmetic.
+- **The published v2 series is internally mixed.** Its numerator (125 in June, 181 in November) is the 30+ count across all open accounts, including `open_no_balance`, while its denominator is active accounts only; `published_recalc_pct` in q1 reproduces every published v2 figure exactly on that basis. On a consistent v2 basis November is 165/5,591 = 2.95%, not 3.24%. The 16 excluded accounts are at 60/90 DPD with a zero statement balance (see open questions).
+- **The spring starting point is artificially low.** From February to May the published numerator was flat (105, 99, 93, 107) while the denominator grew 30% (4,597 to 5,966) as 1,467 accounts opened in March–May, 1–2 months on book and almost never delinquent. The pre-March book alone ran 2.28, 2.10, 1.89, 2.13 over those months. The "1.8%" base is about 0.3–0.5 pp below the book's underlying level.
+
+**Definition used from here on:** v2 basis, 30+ among active accounts over active accounts (statement balance > 0 is the population that can be past due, and it is the house definition going forward). On that basis the rise to answer for is **1.94% (May) to 2.95% (November), +1.01 pp, with a September peak of 4.37%**, not +1.45 pp.
+
+## 2. Three cuts
+
+### 2a. Vintage and months on book (`q2_vintage_months_on_book.sql`)
+
+March–May 2026 added 542 accounts credited to CMP-2026-SPRING-INSTORE (avg FICO 673–676, avg line about $4.2k, 392 of 542 in tiers C/D) and 925 organic accounts (avg FICO 709–711, avg line about $6.2k) against a run-rate of 158–159 organic accounts a month in January–February. Rate by months on book, 30+ active/active, with autopay-failure and April-CLI accounts removed so the curves show seasoning only, benchmarked against the Jun–Oct 2025 organic vintage:
+
+| MOB | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Jun–Oct 2025 organic (benchmark) | 0.66 | 1.12 | 2.71 | 3.21 | 3.98 | 3.61 | 4.51 | 4.67 |
+| Spring 2026 organic | 0.66 | 0.78 | 1.95 | 2.60 | 3.29 | 3.32 | 3.33 | 2.85 |
+| Spring 2026 campaign | 1.11 | 0.68 | 2.73 | 2.47 | 4.17 | 3.66 | 5.41 | 6.21 |
+
+Spring organic sits at or below the benchmark at every MOB: it is seasoning normally, and its contribution to the November level is a mix effect from a vintage twice the usual size reaching MOB 6–8, not a credit problem. The campaign cohort tracks the benchmark through MOB 6 and runs above it at MOB 7–8 (5.41 vs 4.51, 6.21 vs 4.67) on 314 and 145 active accounts. That is consistent with the 20-point score-floor reduction in the pilot and is the one genuine credit-quality signal in the book; it is modest and the base is still small.
+
+### 2b. The April line-increase cohort (`q3_cli_april_cohort.sql`)
+
+Treated accounts are identified by a credit_line step between 2026-03 and 2026-04: 867 accounts (221 tier B, 646 tier C), all opened 2023-01 to 2025-12, lines raised ×1.25 (B $6,496 to $8,120; C $3,894 to $4,868), all at 0 DPD in March (the eligibility screen). The fair comparison is therefore against untreated B/C accounts that were also active and current in March, opened before 2026-03, with autopay-failure accounts removed from both arms: 801 treated vs 1,373 peers.
+
+| | Mar | May | Jul | Sep | Nov |
+|---|---|---|---|---|---|
+| Treated 30+ rate | 0.00 | 3.63 | 5.35 | 6.83 | 5.65 |
+| Peers 30+ rate | 0.00 | 1.34 | 1.80 | 1.79 | 2.59 |
+| Treated avg utilization | 0.551 | 0.730 | 0.725 | 0.724 | 0.839 |
+| Peers avg utilization | 0.373 | 0.399 | 0.400 | 0.401 | 0.473 |
+
+Treated balances went from $2,464 to $4,037 within two months (+64%); peers moved $2,316 to $2,451. The treated cohort has run two to three times the peer rate since May. This gap opened before the definition change and before the payments migration; it is the earliest real driver and it is what the consistent June–July rise (2.23 to 2.33 on v2) is made of.
+
+### 2c. Autopay failures and the September spike (`q4_autopay_failure_cohort.sql`)
+
+Scheduled debits not submitted: 359 of 3,025 attempts in August (11.87%) and 373 of 3,134 in September (11.90%); zero in every other month, and `payment_received` is 0 on every failed row. 416 distinct accounts were hit, 395 of them current in July. Their 30+ rate: 1.44% (Jul), 16.94% (Aug), 23.32% (Sep), 8.09% (Oct), 3.53% (Nov). The lag is visible in the buckets: August failures put 60 accounts at 30 DPD in August; in September 64 accounts are at 30 DPD and 23 have rolled to 60+, so **September stacks the August cohort rolling with the September cohort arriving**, which is why it is the peak. After the 27 September fix the cohort cures (3 at 30 DPD in October, 2 in November) but the roll continues: 25 at 60+ in October, 10 in November, with charge-offs on top. Controls: autopay accounts without a failure ran 1.30 to 2.16 to 1.62 over Jul/Sep/Nov; non-autopay accounts 3.54 to 4.00 to 4.35.
+
+**Remediation sizing:** 130 of the 416 were 30+ at some point Aug–Nov, 126 of them current in July; 27 are still 60+ in November; 15 are charged off, all 15 current in July. These are bank-caused missed payments. Late fees and interest must be reversed (ops notes say fee reversals ran in October; completeness is unverified), delinquency reported to the bureaus for Aug–Nov must be corrected or suppressed for these accounts, and the 15 charge-offs and 27 still-60+ need individual review before any further bureau or recovery action.
+
+## 3. Attribution (`q5_attribution_exclusive_groups.sql`)
+
+Change in 30+ active accounts by mutually exclusive group, priority order autopay-failed > April CLI > spring campaign > spring organic > post-May vintage > rest of book. 30+ active accounts: 102 (May), 127 (Jul), 248 (Sep), 165 (Nov).
+
+| Group (accounts) | May→Nov (+63) | Jul→Nov (+38) | Jul→Sep spike (+121) | Rate May→Nov |
+|---|---|---|---|---|
+| Autopay failed Aug/Sep (416) | +11 (17%) | +7 (18%) | **+82 (68%)** | 0.29 → 3.53 |
+| April CLI treated (801) | +12 (19%) | +1 (3%) | +10 (8%) | 3.63 → 5.65 |
+| Spring campaign vintage (517) | +20 (32%) | +18 (47%) | +7 (6%) | 1.35 → 6.03 |
+| Spring organic vintage (874) | +19 (30%) | +11 (29%) | +13 (11%) | 0.66 → 3.22 |
+| Post-May vintage (611) | +8 (13%) | +6 (16%) | +5 (4%) | n/a → 1.51 |
+| Rest of book (3,781) | −7 (−11%) | −5 (−13%) | +4 (3%) | 2.13 → 1.99 |
+
+Shares move with the base month and I will present two in the final: from May, the two spring vintages are 62% of the rise and the CLI wave 19%, because the CLI damage was already in the May numerator; from July, the campaign vintage alone is 47% and CLI is 3%. The September spike is a different event: 68% of it is the autopay failure. The rest of the book, 3,781 accounts, improved (64 to 57 accounts, 2.13% to 1.99%). **This is not a book-wide deterioration.**
+
+## 4. What is not a driver (`q6_rule_outs.sql`)
+
+- **Holiday seasonality.** November 2025 added 16 accounts (+0.31 pp) over October 2025; November 2026 is 18 accounts and 0.30 pp *below* October. The rest of the book is down 7 accounts since May.
+- **Texas.** TX ran 1.78 / 4.44 / 3.24 in May / Sep / Nov against 1.96 / 4.36 / 2.90 for all other states; TX is 25 of 165 November 30+ accounts (15%) on 771 of 5,591 actives (14%). It moves with the book.
+- **Affiliate and the 2025 holiday campaign.** Affiliate: 5 to 9 accounts May to Nov on 293 actives; holiday 2025 campaign: 5 to 7 on 112 actives. Together +6 of the +63, and the holiday campaign's 4.35% in May was already its level before the rise.
+- **Book-wide FICO drift.** Average FICO at origination of the active book: 712.6 (Feb), 708.6 (May), 709.4 (Nov); tier C/D share 30.4%, 34.7%, 33.6%. The 4-point dip is the spring campaign entering in March–May; from May to November the mix is flat and the rest-of-book rate fell.
+
+## 5. Actions, ordered by impact
+
+1. **Finish PAY-4471 remediation and prove it (Payments Operations, with Collections; Compliance sign-off).** Fee and interest reversal on all 130 ever-30+ accounts, bureau correction for Aug–Nov tradelines on the 126 that were current in July, individual review of 15 charge-offs and 27 still-60+ before any further action, and a fail-rate alert on the new vendor. Cost: write-back on 130 accounts and reversal of up to 15 charge-offs. Risk if skipped: regulatory (FCRA / unfair-practice) and partner exposure far larger than the write-back.
+2. **Pause proactive CLI wave 4 and review P-2026-04-CLI (Credit Risk, policy owner).** Treated accounts drew to 73% utilization within a month and run 5.65% vs 2.59% for matched peers. Add a utilization cap and a post-increase drawdown trigger before the next wave; consider line reductions on treated accounts already 30+. Cost: foregone balance growth on the treated book and complaints on any reductions.
+3. **Do not carry the lowered score floor into the holiday campaign (Portfolio Director with Partner Marketing; Credit Risk on the floor).** Keep instant decisioning at register, restore the standard floor. The pilot cohort is above the vintage benchmark at MOB 7–8; the base is small, so this is a precaution, not an accusation. Cost: fewer register approvals in the partner's peak season; the partner will push back.
+4. **Restate the KPI pack (Portfolio Analytics, KPI pack owner).** Publish v1 and v2 side by side through June, align the v2 numerator with the active-only denominator (0.29 pp in November), and add an MOB-matured view. Cost: one restatement note to the partner; it also pre-empts the "your customers" conversation with a consistent series.
+
+**For the partner:** about two-thirds of the September spike was our payments platform; the November level over May is mostly a large vintage seasoning normally plus our own line-increase wave; the pre-2026 book has improved. Their customers' credit is not the story, with the narrow exception of the lowered-floor pilot, which we will watch for two more months.
+
+## 6. Definitions used
+
+- 30+ DPD account: `dpd_bucket >= 30` at cycle end. Charged-off accounts excluded from numerator and denominator in both bases.
+- v1 basis: 30+ among `active` + `open_no_balance` over `active` + `open_no_balance`. v2 basis (used for all cohort work): 30+ among `active` over `active`.
+- Vintage = `open_month`; months on book from `months_on_book`. Treated = `credit_line` in 2026-04 greater than in 2026-03. Autopay-failure cohort = any `autopay_failed = 1` in 2026-08 or 2026-09.
+- Attribution groups are mutually exclusive in the priority order stated; counts are 30+ active accounts.
+
+## 7. Open questions I still intend to check
+
+1. 16 accounts in November are at 60/90 DPD in `open_no_balance` status with a zero statement balance. Which status rule produces that (write-down, dispute, re-age) and do they belong in the numerator at all? This decides the final v2 restatement.
+2. The treated CLI cohort's balance jump ($2,464 to $4,037 in two months): purchase spend or balance transfer / cash? Needs transaction data; it decides whether line reduction or a drawdown trigger is the right lever.
+3. Whether the October outreach reached the 15 charged-off autopay accounts and whether fee reversals included interest. Needs the collections contact log and fee ledger, neither in this dataset.
+4. The campaign cohort's MOB 7–8 excess rests on 314 and 145 active accounts. December and January data will confirm or dissolve it before anything is said to the partner about their customers.

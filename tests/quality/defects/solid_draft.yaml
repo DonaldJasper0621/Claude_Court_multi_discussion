@@ -1,0 +1,17 @@
+case: solid_draft
+summary: Sound day-6 draft that restates the series on consistent definitions, separates the September autopay spike from the vintage-and-CLI driven November level, attributes the change with exclusive groups on two bases, rules out four red herrings numerically and flags remediation duty.
+defects: []
+strengths:
+  - Restates the published series on both definitions side by side, quantifies the June step (0.28 of 0.55 pp) and shows the published v2 numerator includes open_no_balance accounts the denominator excludes, reproducing every published figure to confirm it.
+  - Shows the spring starting point is depressed by denominator growth (flat numerator 105-107 while open accounts grew 30 percent; pre-March book 2.1-2.3 percent) and sizes the real rise at +1.01 pp on a consistent basis.
+  - Months-on-book curves are benchmarked against a prior vintage with autopay-hit and CLI accounts removed, so the organic spring vintage is correctly read as normal seasoning and the campaign cohort's excess is isolated to MOB 7-8 with its small base stated.
+  - CLI cohort is identified from the data (credit_line step in 2026-04, 867 accounts) and compared with untreated same-tier peers who were also current in March, removing the eligibility-selection bias, with utilization and balance shown as the mechanism.
+  - Autopay failure analysed with its bucket lag (August failures roll to 60+ in September while September failures arrive at 30), explaining why September is the peak, with autopay-no-failure and no-autopay controls.
+  - Attribution uses mutually exclusive groups that sum to the total change, is shown from two base months plus the spike window, and explicitly states that shares move with the base month; the rest-of-book decline rules out book-wide deterioration.
+  - Each rule-out (holiday, Texas, affiliate and holiday campaign, FICO drift) is dismissed with a specific number rather than assertion.
+  - Recommendations follow from the findings, name an owner and a cost or risk, and the remediation duty for bank-caused missed payments (fees, interest, bureau tradelines, 15 charge-offs) is flagged with sizing.
+known_limitations:
+  - MOB 7-8 for the campaign cohort rests on 314 and 145 active accounts; the draft says so and defers the partner conversation until December and January data confirm it, which is appropriate on day 6.
+  - The treated-vs-peer CLI comparison is observational (eligibility was not random); the draft controls for tier, open date and March status, states the selection screen, and names transaction data as the next check, which is as far as this dataset allows.
+  - Remediation counts (130 ever 30+, 15 charge-offs) come from performance data only; fee ledger and collections logs are not in the dataset and the draft lists them as open questions rather than asserting completeness.
+  - The 16 open_no_balance accounts at 60/90 DPD are left as an open question rather than resolved; the draft shows the effect (0.29 pp in November) and uses the consistent definition in the meantime.
