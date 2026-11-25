@@ -204,7 +204,54 @@ def init_project(target: Path, *, force: bool = False) -> list[Path]:
         written.append(gi)
     for skill_dir in sorted(p for p in (ASSETS / "skills").iterdir() if p.is_dir()):
         copy(skill_dir / "SKILL.md", target / ".claude" / "skills" / skill_dir.name / "SKILL.md")
+    if write_project_settings(target):
+        written.append(target / ".claude" / "settings.json")
     return written
+
+
+# Permission rules that keep Claude (and its subagents) out of the sealed
+# scenario material. Only the Python CLI decodes a key, through --answer-key,
+# and only into the Judge's prompt. Bash patterns are prefix matches on the
+# command string, so they catch the obvious ways of printing a file; the Read
+# rule is the one that matters for the file tools.
+SEALED_DENY_RULES = [
+    "Read(./.rehearsal/scenarios/**)",
+    "Edit(./.rehearsal/scenarios/**)",
+    "Write(./.rehearsal/scenarios/**)",
+    "Bash(cat .rehearsal/scenarios:*)",
+    "Bash(cat ./.rehearsal/scenarios:*)",
+    "Bash(base64:*)",
+    "Bash(head .rehearsal/scenarios:*)",
+    "Bash(tail .rehearsal/scenarios:*)",
+    "Bash(less .rehearsal/scenarios:*)",
+    "Bash(strings .rehearsal/scenarios:*)",
+]
+
+
+def write_project_settings(target: Path) -> bool:
+    """Merge the sealed-material deny rules into `<target>/.claude/settings.json`.
+    Returns True if the file changed."""
+    import json
+
+    path = target / ".claude" / "settings.json"
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) or {}
+        except json.JSONDecodeError:
+            data = {}
+    perms = data.setdefault("permissions", {})
+    deny = list(perms.get("deny", []))
+    before = list(deny)
+    for rule in SEALED_DENY_RULES:
+        if rule not in deny:
+            deny.append(rule)
+    if deny == before and path.exists():
+        return False
+    perms["deny"] = deny
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True
 
 
 def install_skills(home: Path | None = None, *, force: bool = False) -> list[Path]:

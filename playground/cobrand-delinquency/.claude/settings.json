@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.rehearsal/scenarios/**)",
+      "Edit(./.rehearsal/scenarios/**)",
+      "Write(./.rehearsal/scenarios/**)",
+      "Bash(cat .rehearsal/scenarios:*)",
+      "Bash(cat ./.rehearsal/scenarios:*)",
+      "Bash(base64:*)",
+      "Bash(head .rehearsal/scenarios:*)",
+      "Bash(tail .rehearsal/scenarios:*)",
+      "Bash(less .rehearsal/scenarios:*)",
+      "Bash(strings .rehearsal/scenarios:*)"
+    ]
+  }
+}

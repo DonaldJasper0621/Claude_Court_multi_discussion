@@ -103,13 +103,18 @@ def init_session(
     return save_session(session, cfg.sessions_dir)
 
 
-def advance(cfg: Config, session_dir: Path, *, skip: list[str] | None = None) -> StageReport:
+def advance(cfg: Config, session_dir: Path, *, skip: list[str] | None = None, until: str | None = None) -> StageReport:
+    """Ingest outputs, write the next stage's prompts, or finish. `until` stops
+    the pipeline after that stage (e.g. "judge" to skip the storyline pass)."""
     session = load_session(session_dir)
     panel_roles = [cfg.panelist(rid) for rid in session.panel_ids]
     prompts = prompts_for(cfg, session, inline_context=False)  # subagents read files themselves
     skip = set(skip or [])
+    if until and until not in STAGE_ORDER:
+        raise ValueError(f"unknown stage '{until}'; one of {', '.join(STAGE_ORDER)}")
+    stages = STAGE_ORDER[: STAGE_ORDER.index(until) + 1] if until else STAGE_ORDER
 
-    for stage in STAGE_ORDER:
+    for stage in stages:
         expected = _expected_for(stage, cfg, prompts, session, panel_roles)
         pending: list[Pending] = []
         stage_dir = session_dir / "stages" / stage
@@ -139,8 +144,33 @@ def advance(cfg: Config, session_dir: Path, *, skip: list[str] | None = None) ->
             return StageReport(session_dir=session_dir, stage=stage, pending=pending)
 
     save_session(session, cfg.sessions_dir)
+    if prompts.grading:
+        redact_answer_key(session_dir)
     report = write_report(session, session_dir)
     return StageReport(session_dir=session_dir, stage=None, done=True, report_path=report)
+
+
+ANSWER_KEY_HEADER = "# Sealed answer key (only you see this; the analyst and the panel do not)"
+REDACTED = "# Sealed answer key\n\n[redacted after grading; the key stays sealed under .rehearsal/scenarios/]"
+
+
+def redact_answer_key(session_dir: Path) -> bool:
+    """After a grade run, strip the decoded answer key from the Judge's prompt
+    file so nothing readable is left in the session directory."""
+    path = session_dir / "stages" / "judge" / "judge.prompt.md"
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    start = text.find(ANSWER_KEY_HEADER)
+    if start < 0:
+        return False
+    end = text.find("\n# Task", start)
+    if end < 0:
+        end = text.find("\n# SCHEMA", start)
+    if end < 0:
+        end = len(text)
+    path.write_text(text[:start] + REDACTED + text[end:], encoding="utf-8")
+    return True
 
 
 # --------------------------------------------------------------------------- #

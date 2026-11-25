@@ -140,14 +140,30 @@ class GradeFinding(BaseModel):
     planted_cause: str = Field(description="One cause or trap from the answer key, in the key's words.")
     status: Literal["found", "partially_found", "missed"]
     evidence_in_analysis: str = Field(description="Where the analyst's work shows it, or empty if missed.")
+    quantified: Literal["within_range", "outside_range", "not_quantified", "not_applicable"] = Field(
+        description="Whether the analyst sized it and whether their figure falls inside the key's interval. Ranking against other causes is not required."
+    )
+    analyst_figure: str = Field(description="The analyst's own number or range for this cause, verbatim, or empty.")
+    method_note: str = Field(
+        description="If the analyst's method differs from the key's (different base month, denominator, decomposition), say what the difference is and whether it is reasonable."
+    )
     note: str = Field(description="What they got right or wrong about it, specifically.")
+
+
+class RedHerringCheck(BaseModel):
+    red_herring: str
+    status: Literal["ruled_out", "ignored", "believed"]
+    note: str
 
 
 class GradeReport(BaseModel):
     score_out_of_10: int
     headline: str = Field(description="One sentence: how close the diagnosis is to the truth.")
     causes: list[GradeFinding] = Field(description="One entry per planted cause and per trap in the answer key.")
-    false_leads_taken: list[str] = Field(description="Red herrings the analyst treated as causes.")
+    red_herrings: list[RedHerringCheck] = Field(description="One entry per red herring in the key.")
+    method_assessment: str = Field(
+        description="Does the analyst's method stand on its own: definitions stated, denominators consistent, cohorts cut, causation argued? Judge the method, not its agreement with the key."
+    )
     method_gaps: list[str] = Field(description="Analytical habits that caused misses: wrong denominator, no cohorting, etc.")
     what_was_done_well: list[str]
     what_to_practice_next: list[str]

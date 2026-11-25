@@ -119,11 +119,17 @@
   <p class="headline"><strong>{{ s.grade.score_out_of_10 }} / 10.</strong> {{ s.grade.headline }}</p>
   {% for c in s.grade.causes %}
   <div class="lq" style="margin:8px 0">
-    <div><span class="sev sev-{{ 'low' if c.status == 'found' else ('medium' if c.status == 'partially_found' else 'high') }}">{{ c.status | replace("_", " ") }}</span> <strong>{{ c.planted_cause }}</strong></div>
+    <div><span class="sev sev-{{ 'low' if c.status == 'found' else ('medium' if c.status == 'partially_found' else 'high') }}">{{ c.status | replace("_", " ") }}</span> <strong>{{ c.planted_cause }}</strong> <span class="small muted">· {{ c.quantified | replace("_", " ") }}{% if c.analyst_figure %}: {{ c.analyst_figure }}{% endif %}</span></div>
     {% if c.evidence_in_analysis %}<div class="small muted">Evidence: {{ c.evidence_in_analysis }}</div>{% endif %}
+    {% if c.method_note %}<div class="small"><span class="muted">Method:</span> {{ c.method_note }}</div>{% endif %}
     <div class="small">{{ c.note }}</div>
   </div>
   {% endfor %}
+  {% if s.grade.red_herrings %}
+  <h3 style="margin-top:12px">Red herrings</h3>
+  <ul>{% for r in s.grade.red_herrings %}<li><span class="sev sev-{{ 'low' if r.status == 'ruled_out' else ('medium' if r.status == 'ignored' else 'high') }}">{{ r.status | replace("_", " ") }}</span> {{ r.red_herring }} <span class="small muted">{{ r.note }}</span></li>{% endfor %}</ul>
+  {% endif %}
+  <h3 style="margin-top:12px">Method</h3><p>{{ s.grade.method_assessment }}</p>
 </div>
 <div class="two">
   <div class="card">

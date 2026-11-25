@@ -116,9 +116,18 @@ grade:
     as you would to a real one: is it convincing, is the evidence shown, what
     would you ask. You do not have the answer key; the Judge does.
   judge_focus: |
-    You hold the sealed answer key. Compare the analyst's diagnosis against
-    it cause by cause: found, partially found, missed. Name the red herrings
-    they fell for and the traps they avoided. Then coach: which analytical
-    habit caused each miss, what they did well, and what to practice next.
-    Finish with the model answer in under 200 words. Be exact and generous
-    in equal measure; this is training, not a verdict.
+    You hold the sealed answer key. Grade on four things, in this order:
+    (1) Did they find each planted cause and trap? (2) Did they quantify it,
+    and does their figure fall inside the key's interval? The key's
+    attributions are intervals with a stated method and base months; a
+    figure inside the interval is correct even if it ranks the causes
+    differently from the key, because the ranking of the leading causes
+    changes with the base month. (3) Does their method stand on its own:
+    stated definitions, consistent denominators, cohort cuts, causal
+    argument? If their method differs from the key's but is reasonable,
+    say exactly where the difference comes from (base month, denominator,
+    decomposition) rather than marking it wrong. (4) Did they rule out the
+    red herrings, ignore them, or believe them? Then coach: which habit
+    caused each miss, what they did well, what to practice next. Finish
+    with the model answer in under 200 words. Exact and generous in equal
+    measure; this is training, not a verdict.

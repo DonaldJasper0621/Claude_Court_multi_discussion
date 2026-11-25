@@ -237,7 +237,11 @@ def cmd_stage_next(cfg: Config, args: argparse.Namespace) -> int:
             return 2
         path = candidate
     skip = [s.strip() for s in (args.skip or "").split(",") if s.strip()]
-    report = advance(cfg, path, skip=skip)
+    try:
+        report = advance(cfg, path, skip=skip, until=args.until)
+    except ValueError as e:
+        _err(str(e))
+        return 2
     print(report.format())
     return 0
 
@@ -281,6 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
     sn = st_sub.add_parser("next", help="Ingest written outputs, write the next stage's prompts, or render when done.")
     sn.add_argument("session", help="Session id or path.")
     sn.add_argument("--skip", help="Comma-separated role keys to mark as failed and move past.")
+    sn.add_argument("--until", help="Stop after this stage (coach_pre, panel, judge, coach_post).")
     sn.set_defaults(func=cmd_stage_next)
 
     sub.add_parser("modes", help="List modes and their default panels.").set_defaults(func=cmd_modes)

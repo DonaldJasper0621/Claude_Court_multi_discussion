@@ -42,7 +42,29 @@ Write, for yourself, the answer key first. It must contain:
 
 Causes must be discoverable from the data with reasonable cuts (vintage,
 channel, segment, month, flags). Nothing should require information that is
-not in the files.
+not in the files. Requirements for every new scenario:
+
+- **At least one cause with no paper trail**: no line in the ops notes, no
+  dedicated flag or column. It is visible only by crossing two or three
+  dimensions (for example a particular channel × state × open-quarter, or a
+  product feature × tenure band). The answer key must name the cross-cut that
+  reveals it.
+- **Real data problems**, each documented in the answer key and discoverable
+  by an attentive analyst: duplicate rows (a few hundred, from a re-posted
+  batch), nulls in a field that matters (with a pattern, not at random), late
+  posting (some transactions or payments land in the month after the event,
+  so a naive month-of-record cut is off), and at least one field whose
+  definition changed or differs between two files (name it in the dictionary
+  with its effective date, or leave only a footnote).
+- **Economics the analyst can act on**: the partner revenue-share terms (rate
+  or fee per account and per dollar of spend), interchange and fee revenue
+  per account, loss given default, cost of a line decrease or a program
+  pause, so that every recommended action can be costed. Put them in
+  `data/<scenario>/economics.md` and reference them in the brief.
+- **Attribution as intervals**: state the decomposition method and the base
+  months used, give an interval for each cause across those base months (and
+  a bootstrap band if the counts are small), and say what to accept as correct.
+  Never give a single share.
 
 ## 3. Generate the project files
 
@@ -59,12 +81,17 @@ data/<scenario>/data_dictionary.md  every column, its definition, and any defini
 ```
 
 Write the generator as a deterministic Python script (fixed seed, numpy and
-pandas) that writes the CSVs, run it, and check the headline trend actually
-appears in the published KPI series and that each planted cause is visible
-in the right cut (print a few diagnostic aggregates while generating). Keep
-the data small enough for git: a few thousand accounts, 12 to 18 months,
-under 10 MB total. Then base64 the script and the key into the sealed
-directory and delete the plain copies. The data dictionary and the ops notes
+pandas) that writes the CSVs: at least 30,000 accounts and 12 to 18 months.
+Keep the monthly file under ~60 MB; if it is larger, store it as compressed
+CSV (`.csv.gz`, which pandas and DuckDB read directly) and say so in the
+dictionary. Run it, then **verify the answer key against the generated data**
+with a separate check script: recompute the consistent-definition series,
+each cohort's rate by month, the attribution table for every base month, the
+size of each data problem, and the economics of each action. Every number in
+the key must come from that check, not from the design parameters; if a
+planted effect is too weak to show in the right cut, change the generator,
+not the key. Then base64 the generator, the check script and the key into
+the sealed directory and delete the plain copies. The data dictionary and the ops notes
 may contain the clues a diligent analyst would find in real life (a line in a
 changelog, a definition footnote); the answer key must not be inferable from
 file names or column names.

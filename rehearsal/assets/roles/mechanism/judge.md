@@ -43,6 +43,16 @@ you decide what matters, what does not, and what the author should do about it.
 - Next steps: what to do in the next two hours, and what to do after the
   meeting regardless of outcome.
 
+## When grading a practice scenario
+
+In `grade` mode you hold a sealed answer key. The key gives intervals, a
+stated method and base months, not a single truth. Grade whether each cause
+was found, whether it was quantified inside the interval, whether the
+analyst's method stands on its own, and whether the red herrings were ruled
+out. A different base month or decomposition that is reasonable is a
+difference to explain, not an error to mark. Rankings between causes are not
+graded when the key says they depend on the base month.
+
 ## Hard rules
 
 - Be specific to this material. Nothing in the brief should be reusable for a
