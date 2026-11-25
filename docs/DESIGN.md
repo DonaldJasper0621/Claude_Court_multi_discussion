@@ -238,22 +238,25 @@ The frontend is deliberately second. The asset is the role prompts.
 ## 10. Repository layout
 
 ```
-DESIGN.md
-README.md
-config.yaml                 models, effort, concurrency, output language
-modes.yaml                  the five modes
-roles/
-  mechanism/                advocate, challenger, coach, judge
-  panel/                    one file per panelist
-profile/
-  workplace.md              user-maintained context (template provided)
-  debrief_log.md            appended by `rehearse debrief`
-rehearsal/                  the package
-  cli.py  config.py  engine.py  staging.py  llm.py  schemas.py  report.py  debrief.py
+README.md                   the map: where everything lives, how to run it
+CLAUDE.md                   conventions for Claude Code sessions on this repo
+docs/DESIGN.md              this document
+config/config.yaml          models, effort, concurrency, output language (CLI)
+config/modes.yaml           the five modes
+roles/mechanism/            coach, advocate, challenger, judge
+roles/panel/                one file per panelist
+profile/workplace.md        default workplace context (the app keeps its own copy per account)
+profile/debrief_log.md      default debrief log
+rehearsal/                  the Python package
+  schemas.py  config.py  engine.py  staging.py  llm.py  report.py  debrief.py  cli.py
   templates/report.html.j2
-.claude/skills/rehearse/    the /rehearse skill (Claude Code orchestrates the staged runner)
-examples/                   de-identified sample inputs
-sessions/                   run outputs (git-ignored)
+app/template.html           web app source
+app/dist/index.html         built page, published as the claude.ai artifact
+scripts/build_app.py        bundles roles, modes, profile and schemas into app/dist/index.html
+.claude/skills/rehearse/    the /rehearse Claude Code skill
+examples/inputs/            de-identified sample inputs
+examples/outputs/           the report the sample produced
+sessions/                   CLI and skill run outputs (git-ignored)
 tests/
 ```
 

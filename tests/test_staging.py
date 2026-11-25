@@ -51,7 +51,7 @@ def _answer_all(report):
 
 
 def test_staged_run_walks_all_four_stages(cfg):
-    sample = (ROOT / "examples" / "sample_preread.md").read_text()
+    sample = (ROOT / "examples" / "inputs" / "sample_preread.md").read_text()
     sdir = init_session(cfg, mode_id="preread", input_text=sample, worry="baseline")
     assert (sdir / "session.json").exists()
 

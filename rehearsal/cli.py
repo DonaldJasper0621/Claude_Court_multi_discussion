@@ -224,7 +224,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Pre-meeting rehearsal room: a simulated stakeholder panel for your decks, memos and decisions.",
     )
     p.add_argument("--version", action="version", version=f"rehearse {__version__}")
-    p.add_argument("--root", type=Path, help="Project root containing config.yaml (default: search upward from cwd).")
+    p.add_argument("--root", type=Path, help="Project root containing config/config.yaml (default: search upward from cwd).")
     sub = p.add_subparsers(dest="command", required=True)
 
     r = sub.add_parser("run", help="Run a rehearsal by calling the model directly (needs credentials).")

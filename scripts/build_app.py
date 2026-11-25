@@ -1,7 +1,7 @@
-"""Bundle roles, modes, profile and schemas from the repo into app/index.html.
+"""Bundle roles, modes, profile and schemas from the repo into app/dist/index.html.
 
-The repo stays the source of truth: edit roles/*.md, modes.yaml or
-profile/workplace.md, run this script, republish app/index.html.
+The repo stays the source of truth: edit roles/*.md, config/modes.yaml or
+profile/workplace.md, run this script, republish app/dist/index.html.
 
     python scripts/build_app.py
 """
@@ -78,5 +78,5 @@ def build(template: Path, out: Path) -> Path:
 
 
 if __name__ == "__main__":
-    result = build(ROOT / "app" / "template.html", ROOT / "app" / "index.html")
+    result = build(ROOT / "app" / "template.html", ROOT / "app" / "dist" / "index.html")
     print(result, f"{result.stat().st_size / 1024:.0f} KB")

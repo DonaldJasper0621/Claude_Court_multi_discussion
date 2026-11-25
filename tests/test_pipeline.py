@@ -58,7 +58,7 @@ def test_mock_instance_validates_every_schema():
 def _run(cfg, mode="preread", panel=None, worry="baseline"):
     llm = MockLLM()
     engine = Engine(cfg, llm, mock=True)
-    sample = (ROOT / "examples" / "sample_preread.md").read_text(encoding="utf-8")
+    sample = (ROOT / "examples" / "inputs" / "sample_preread.md").read_text(encoding="utf-8")
     session = asyncio.run(engine.run(mode_id=mode, input_text=sample, worry=worry, panel_ids=panel))
     return session, llm
 

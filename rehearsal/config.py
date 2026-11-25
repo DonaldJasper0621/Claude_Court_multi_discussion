@@ -1,4 +1,4 @@
-"""Load config.yaml, modes.yaml, role personas, and the workplace profile."""
+"""Load config/config.yaml, config/modes.yaml, role personas, and the workplace profile."""
 
 from __future__ import annotations
 
@@ -84,25 +84,25 @@ class Config:
 
 
 def find_root(start: Path | None = None) -> Path:
-    """Walk up from `start` (default cwd) until a directory with config.yaml."""
+    """Walk up from `start` (default cwd) until a directory with config/config.yaml."""
     env = os.environ.get("REHEARSAL_ROOT")
     if env:
         root = Path(env).expanduser().resolve()
-        if (root / "config.yaml").exists():
+        if (root / "config" / "config.yaml").exists():
             return root
-        raise ConfigError(f"REHEARSAL_ROOT={root} has no config.yaml")
+        raise ConfigError(f"REHEARSAL_ROOT={root} has no config/config.yaml")
     here = (start or Path.cwd()).resolve()
     for candidate in [here, *here.parents]:
-        if (candidate / "config.yaml").exists() and (candidate / "modes.yaml").exists():
+        if (candidate / "config" / "config.yaml").exists():
             return candidate
     raise ConfigError(
-        "Could not find config.yaml. Run from inside the project, or set REHEARSAL_ROOT."
+        "Could not find config/config.yaml. Run from inside the project, or set REHEARSAL_ROOT."
     )
 
 
 def load_config(root: Path | None = None) -> Config:
     root = root or find_root()
-    raw = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8")) or {}
+    raw = yaml.safe_load((root / "config" / "config.yaml").read_text(encoding="utf-8")) or {}
     try:
         cfg = Config(
             root=root,

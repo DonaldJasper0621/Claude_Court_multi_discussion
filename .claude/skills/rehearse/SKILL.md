@@ -11,7 +11,7 @@ you run each prompt in its own subagent so the roles stay independent; the
 package validates the JSON each subagent writes, advances the stage, and
 renders the report. No API key is involved: the subagents are the model.
 
-Read `DESIGN.md` only if you need background. The procedure below is complete.
+Read `docs/DESIGN.md` only if you need background. The procedure below is complete.
 
 ## 1. Collect the inputs
 
