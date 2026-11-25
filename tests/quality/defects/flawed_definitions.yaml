@@ -1,0 +1,114 @@
+case: flawed_definitions
+summary: Confident day-4 diagnosis that mixes v1/v2 definitions in the headline, falsely claims to reproduce the published series, counts charge-offs as cures, mislabels a vintage cut as a seasoning curve, understates segment rates with an all-rows denominator, misreads the spring dilution dip, and recommends a book-wide line cut its findings do not support.
+defects:
+  - id: D1
+    tier: obvious
+    severity: high
+    description: >
+      The headline compares 1.79% (May 2026, published v1 definition: open accounts in the denominator) with
+      3.24% (Nov 2026, published v2: active accounts only) and calls it a 1.45-point rise, then asserts the
+      definition change "does not materially change the picture" with no number and no restated series.
+      On a consistent v1 basis the data gives May 1.79% -> Nov 2.85% (181/6,358), Sep 4.03%, so about 0.4 of
+      the 1.45 points (over a quarter of the rise) is definitional. The Director's question 2 ("how much of
+      the rise is real, on a consistent basis") is left unanswered while being claimed as answered.
+    where: "draft.md, section 'Headline', first paragraph"
+    what_a_catch_looks_like: >
+      Reviewer says the May and November figures are on different definitions and cannot be subtracted,
+      and that the "does not materially change the picture" claim needs a restated series or a number
+      (ideally they compute or ask for the v1-basis November rate of about 2.85%).
+  - id: D2
+    tier: needs_files
+    severity: high
+    description: >
+      queries/q2_published_recon.sql filters on status = 'active' for every month, so for the v1 months
+      (through 2026-05) it drops open_no_balance accounts from both the denominator and the numerator.
+      It yields May 2026 = 102/5,266 = 1.94% (published 1.79%, 107/5,966), and for the v2 months it also
+      misses the published numerator (June 119/5,340 = 2.23% vs published 125/5,340 = 2.34%; Nov 2.95% vs
+      3.24%). The draft's claim that the query "reproduces the published v1 series through May and the v2
+      series from June" is false for every month; only the Nov denominator (5,591) matches. The conclusion
+      "the pack numbers are trustworthy" is therefore unsupported, and the mismatch actually reveals that the
+      published v2 series counts open_no_balance delinquents in the numerator while excluding them from the
+      denominator.
+    where: "queries/q2_published_recon.sql line 9 (where m.status = 'active'); draft.md, section 'Reconciliation of the published series'"
+    what_a_catch_looks_like: >
+      Reviewer opens or runs q2 and states that it does not reproduce the published v1 figures (e.g. May
+      1.94% vs 1.79%) because the status = 'active' filter excludes open_no_balance accounts, and that the
+      reproduction claim in the draft is false.
+  - id: D3
+    tier: needs_domain
+    severity: high
+    description: >
+      The draft treats any September 30+ account that is not "active and 30+" in November as cured. Of the
+      260 September 30+ accounts, 49 charged off by November (20 in October, 29 in November; charged-off
+      accounts carry one charged_off row and then leave the book) and 9 more sit at 90 DPD in
+      open_no_balance status. Real outcome: 162 current (62%), 49 still delinquent (19%), 49 charged off
+      (19%). For the autopay-impacted group of 93: 67 current, 10 still delinquent, 16 charged off (17%),
+      not "84 of 93 cured". Charge-off is the worst outcome, not a cure, so "the September cohort has fully
+      cured" and "the spike is behind us" are wrong, and the partner message would understate losses.
+    where: "draft.md, section 'The September cohort has cured'; queries/q4_autopay_and_cure.sql lines 33-36 (still_dpd30 uses n.status = 'active'; cured_by_nov = total minus that)"
+    what_a_catch_looks_like: >
+      Reviewer says that accounts leaving the 30+ bucket via charge-off (or dropping off the book) are not
+      cures and that the 85% / 90% cure figures must be split into cured vs charged off vs still delinquent.
+  - id: D4
+    tier: obvious
+    severity: high
+    description: >
+      Recommendation 3 is a book-wide 10% credit line decrease on all open accounts. Nothing in the draft
+      supports a book-wide action: its own findings are that tiers A and B are back near May levels, the
+      spike was an operational autopay failure that has (per the draft) cured, the lasting problem is a
+      542-account campaign cohort and tiers C/D, and the CLI question is explicitly unresolved. The action
+      would hit the healthy 70% of the book, cost spend and interchange, and strain the partner relationship
+      without targeting either identified driver.
+    where: "draft.md, section 'Recommendations, ordered by impact', item 3"
+    what_a_catch_looks_like: >
+      Reviewer says the book-wide line decrease does not follow from the segment-specific findings and
+      should be dropped or narrowed to the identified segments (campaign vintage, tiers C/D, or the CLI
+      wave once analysed).
+  - id: D5
+    tier: needs_files
+    severity: medium
+    description: >
+      queries/q3_vintage_seasoning.sql groups by a.open_month and labels max(months_on_book) as
+      "months_on_book"; rate_pct is each vintage's 30+ rate pooled over all its performance months, so it is
+      a per-vintage lifetime average confounded with calendar time (older vintages include the Aug-Sep
+      spike months), not a seasoning curve. The draft presents the output as "30+ rate by months on book"
+      and concludes the curve "is still rising at 15 months", that the spring vintage "has not reached its
+      seasoning peak" and will add 1.1 to 1.5 points. A true months_on_book cut (group by
+      m.months_on_book) peaks at 3.67-3.77% around 7-10 months on book and declines after 12, so the
+      quoted seasoning claim is not what the query computes.
+    where: "queries/q3_vintage_seasoning.sql lines 2-3 and 11 (group by a.open_month; max(months_on_book) aliased as months_on_book); draft.md, section 'Driver 2', second paragraph"
+    what_a_catch_looks_like: >
+      Reviewer notes that q3 groups by open_month (a vintage cut pooled across months) and not by
+      months_on_book, so the "seasoning curve" and the forward projection for the spring vintage are not
+      supported by the query.
+  - id: D6
+    tier: needs_domain
+    severity: medium
+    description: >
+      The draft reads the published v1 dip from 2.28% (Feb) to 1.96% (Mar) and 1.67% (Apr) as "the book
+      was improving before the summer", making the deterioration "a June-onwards event". The denominator
+      grew from 4,597 to 5,579 in two months because 1,467 spring accounts were booked; accounts 0-2
+      months on book cannot be 30+ yet (spring vintage 30+ rate 0.62% Mar, 0.67% Apr, 0.76% May), so they
+      dilute the rate. Excluding them the rest of the book ran 2.10% (Mar), 1.89% (Apr), 2.13% (May), i.e.
+      roughly flat versus February, and the lower-quality vintage was already being added. The "improving
+      book" framing misdates the problem and hides that the spring booking is itself the start of driver 2.
+    where: "draft.md, section 'Headline', second paragraph"
+    what_a_catch_looks_like: >
+      Reviewer says the spring dip is denominator dilution from a large young vintage that is too new to be
+      delinquent, not an improvement in the book, and that the rate should be looked at excluding the new
+      vintage or by vintage.
+  - id: D7
+    tier: needs_files
+    severity: low
+    description: >
+      queries/q1_segment_rates.sql uses count(*) over all monthly_performance rows as the denominator,
+      which includes closed and charged_off rows, while the numerator is restricted to open accounts. Every
+      rate it reports is understated: e.g. Nov tier D 52/739 = 7.04% vs 52/729 = 7.13% on open accounts,
+      tier C 4.96% vs 5.00%, Sep tier C 6.37% vs 6.41%. The draft quotes these rates in its tier and
+      channel tables. The understatement is small at these cell sizes but systematic, and it grows in any
+      segment with more charge-offs (exactly the segments the draft says matter).
+    where: "queries/q1_segment_rates.sql lines 4, 7, 16 and 19 (count(*) as accounts and as the rate denominator); draft.md, section 'Which customers'"
+    what_a_catch_looks_like: >
+      Reviewer notes that the q1 denominator counts closed and charged-off rows and so is not the open-
+      (or active-) account base the numerator uses, making the tier and channel rates understated and
+      inconsistent with the published definitions.

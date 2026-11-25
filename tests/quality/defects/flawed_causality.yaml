@@ -1,0 +1,122 @@
+case: flawed_causality
+summary: A strong-looking day-5 diagnosis that reads a cross-sectional correlation as cause, mis-joins the campaign cut, mis-times the autopay attribution, and proposes two card-business actions that would penalize bank-caused delinquency and blame the partner for our own approval policy.
+defects:
+  - id: D1
+    tier: obvious
+    severity: high
+    description: >
+      The claim that the April credit line increases caused the post-incident rise rests on a single
+      November cross-section (30+ rate by utilization band, plus the cohort's 5.44% against the book's
+      2.85%). There is no treated-vs-untreated comparison (the cohort is all tier B/C, and tier C runs 5.0%
+      in November on its own, so the cohort-vs-book gap is largely tier mix) and no timing argument (no
+      pre-April baseline for the cohort, no month-by-month path, no comparison with B/C accounts that did
+      not receive an increase). "Higher utilization is more delinquent" is true of every card book and
+      says nothing about what a line increase did to these accounts.
+    where: "draft.md, section '3. Driver two: the April credit line program'"
+    what_a_catch_looks_like: >
+      The reviewer says the utilization-band table and the cohort-vs-book comparison are correlational
+      snapshots and cannot support "the April line increases are therefore the cause"; asks for the
+      cohort's rate before and after April against a matched group of tier B/C accounts without an
+      increase (or otherwise names the tier-mix confound or the missing pre/post comparison).
+  - id: D6
+    tier: needs_domain
+    severity: high
+    description: >
+      Recommendation 1 moves the autopay-impacted customers who went 30+ onto the higher-risk pricing
+      tier with a twelve-month APR step-up because they "showed delinquency". Their delinquency was caused
+      by the bank's own payments migration (PAY-4471): the debits they had scheduled were not submitted.
+      The required treatment is remediation (fee and interest reversal, correction of any bureau reporting,
+      no penalty pricing, no adverse action), which ops notes show is already under way. Re-pricing them
+      is a UDAAP / fair-treatment exposure and a regulatory finding waiting to happen, and would sour the
+      partner relationship.
+    where: "draft.md, section '6. Recommendations', item 1"
+    what_a_catch_looks_like: >
+      The reviewer says the autopay-affected customers must not be penalized or re-priced because the
+      missed payments were bank-caused; names remediation (fee/interest reversal, bureau correction) as the
+      correct action and/or flags the UDAAP, fair-treatment or regulatory exposure of penalty pricing them.
+  - id: D7
+    tier: needs_domain
+    severity: high
+    description: >
+      The draft concludes the partner's in-store customer base is weaker and proposes telling the partner
+      so. The evidence is one spring-vintage comparison (in-store accounts opened Mar-May 2026 at 5.70% vs
+      3.20% for other-channel spring openers). campaigns.csv shows that cohort was booked under
+      CMP-2026-SPRING-INSTORE with an expanded approval policy on our side ("score floor lowered 20 points
+      for in-store applicants", instant approval at register), and accounts.csv shows those accounts
+      averaged FICO 675 at origination (72% tier C/D) against about 711 for every other channel and for
+      in-store accounts booked before March. The in-store channel as a whole runs 3.09% in November, in
+      line with partner_online (3.02%) and affiliate (3.07%). The weakness is our underwriting pilot, not
+      the partner's customer, and the brief said anything blaming their customers must be airtight.
+    where: "draft.md, section '4. Which customers', paragraph 'The in-store story is a partner story', and section '6. Recommendations', item 2"
+    what_a_catch_looks_like: >
+      The reviewer says the spring in-store cohort's weakness traces to our own expanded approval policy /
+      score-floor reduction (or the lower origination FICO we approved), not to the partner's customer
+      base, and that the comparison covers only the spring campaign months and so cannot support a claim
+      about the in-store channel; warns against taking that message to the partner.
+  - id: D5
+    tier: needs_files
+    severity: high
+    description: >
+      q3's attribution counts an account as incident-related only when autopay_failed = 1 and dpd_bucket
+      >= 30 fall in the same month. A debit that fails in month M puts the account 30 DPD at the next cycle
+      and rolls to 60 and 90 after that. Counting failures in the current or two prior months gives 61,
+      93, 38, 13 for Aug-Nov (and the 416 affected accounts contribute 39 delinquents in October and 29 in
+      November, mostly in the 60/90 buckets), not 61, 87, 0, 0. The draft therefore reports a zero incident
+      contribution in October and November and attributes the whole residual to "credit deterioration",
+      which it then pins on the April program.
+    where: "queries/q3_autopay_incident.sql, third statement (filter 'dpd_bucket >= 30 and autopay_failed = 1' on the same row); draft.md section 2, paragraph 'Contribution'"
+    what_a_catch_looks_like: >
+      The reviewer says the autopay contribution is computed on the same month as the failed debit and
+      misses the lag and the roll to 60/90, so the October and November contribution is not zero and the
+      "residual is credit deterioration" conclusion is overstated; or recomputes with a one- to two-month
+      lag and shows the tail.
+  - id: D4
+    tier: needs_files
+    severity: medium
+    description: >
+      q4 attributes campaign membership by joining campaigns on acquisition channel (with 'mixed' matching
+      every channel) and the account's open month falling in the campaign window, instead of using
+      accounts.campaign_id. Every account opened Nov-Dec 2025 is swept into CMP-2025-HOLIDAY whatever its
+      campaign (247 active in November vs 118 truly attributed, 13 delinquents vs 7), ORGANIC in-store
+      spring openers are added to CMP-2026-SPRING-INSTORE (491 vs 451), and CMP-2024-FALL-ONLINE loses its
+      in-store and affiliate members (86 vs 116). The draft's "two campaigns are material" and the holiday
+      campaign's "second-largest contributor at 13 accounts" rest on the inflated counts; the true holiday
+      campaign has 118 accounts and 7 delinquents.
+    where: "queries/q4_campaign_channel_cut.sql, first statement, join 'on (c.channel = a.acquisition_channel or c.channel = ''mixed'') and a.open_month between c.start_month and c.end_month'; draft.md section 4 campaign table"
+    what_a_catch_looks_like: >
+      The reviewer notices the campaign cut does not use accounts.campaign_id and that the channel/window
+      join over-attributes accounts (names HOLIDAY as roughly doubled, or that 'mixed' matches all
+      channels, or that ORGANIC accounts are being counted as campaign accounts), and says the holiday
+      campaign is not a material driver on the correct counts.
+  - id: D2
+    tier: obvious
+    severity: medium
+    description: >
+      Section 5 takes the incremental charge-offs of the last six months ($237k - $136k = $101k) and
+      doubles them to "roughly $200k of incremental charge-offs" a year, with no caveat. The six months
+      contain a one-off platform incident the draft itself says is fixed, a 29-account November charge-off
+      month that is the incident rolling through, a book that grew nearly 7%, and holiday seasonality; a straight
+      x2 is not a forecast. The "pipeline" sentence compounds it by treating all 30+ balances as future
+      loss.
+    where: "draft.md, section '5. Sizing'"
+    what_a_catch_looks_like: >
+      The reviewer says the annual loss figure is a six-month number multiplied by two and cannot be
+      presented as an annual run-rate without separating the one-off incident, book growth or seasonality
+      (or otherwise objects that the extrapolation carries no caveat).
+  - id: D3
+    tier: needs_files
+    severity: low
+    description: >
+      q2 defines the "April program cohort" as accounts whose credit_line in November 2026 exceeds their
+      initial_credit_line. Nothing in that definition is tied to April or to policy P-2026-04-CLI; it is an
+      end-state test that would capture any line change in any month and, because it requires a November
+      row, drops the program accounts that closed or charged off before November. The actual wave 3
+      cohort is the 867 accounts whose credit_line stepped up between March and April 2026; q2 returns
+      827 and the draft quotes "827 accounts". The survivorship also flatters the cohort's earlier months
+      (6.0% vs 7.3% 30+ in August on the same all-open basis).
+    where: "queries/q2_cli_cohort.sql, CTE cli_cohort (m.month = '2026-11' and m.credit_line > a.initial_credit_line)"
+    what_a_catch_looks_like: >
+      The reviewer says the cohort is identified by current line vs origination line rather than by the
+      April line-change event (month-over-month credit_line increase in 2026-04), and/or that requiring a
+      November row excludes accounts that have since closed or charged off, so the cohort size and history
+      quoted as "the April program cohort" are not the program cohort.
